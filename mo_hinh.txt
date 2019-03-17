@@ -1,0 +1,33 @@
++ Mô hình có cảm biến nhiệt độ, độ ẩm, dinh dưỡng
+
+=> Mục tiêu là kích hoạt máy bơm nước hoặc đèn cho vườn rau
+
+=> Câu hỏi: Khi nào cần kích hoạt máy bơm, đèn?
+
++ Các thành phần: DHT22: cảm biến nhiệt độ, độ ẩm. LDR (light), moisture sensor (hơi ẩm) => data được gửi tới cơ sở dữ liệu MySQL sensorreading table mỗi 5-6 giây.
+
++ Chia thành 3 phần: monitor (theo dõi thời gian thực status of storage)
+                     2. Control(cho phép điều khiển các thiết bị như quạt, ánh sáng,)
+					 3. Warning (cảnh báo khi có sự bất thường của môi trường).
+					 
++ Control: 
+ 1. điều khiển bằng tay: 4 nút nhấn được thêm để điểu khiển freezer, fan, heater, light
+ 2. Điều khiển tự động: 
+    (1)Khởi động -> (2)Thiết lập kết nối với Web Server -> (3)lấy thông tin điều khiển phiên trước ->(4)đọc dữ liệu cảm biến -> (5)nếu giá trị cảm biến không phải giá trị tối ưu -> (6)tạo warning và điều chỉnh theo giá trị tối ưu -> 
+	
++ Warning: khi có bất kỳ bất thường xảy ra trong môi trường với 3 mức: mức 1 là vượt quá limit sensor value một chút, mức 2 là vượt quá ở medium level, mức 3 là ngoài vùng điều khiển
+
+**** Website và android apps: admin cần phải đăng kí và dăng nhập với đúng thông tin credential  
+
++ Mã hóa password với giải thuật bcrypt và salt
+
+**** Chi tiết của Monitor ***
+Chia làm 2 section chính là hardware và server.
+Hardware: gồm 4 sensor interface của light, mosisure sensor, temperature sensor, humidty sensor. Dữ liệu được upload lên Wec Server thông qua Ethernet Shield.
+
+**** STMF32 ARM Cortex M4****
+To be defined 
+
+++ DHT22 : Dual temperature và Humidity sensor 
+
+					 
