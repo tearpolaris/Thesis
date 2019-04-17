@@ -20,7 +20,8 @@ typedef enum TYPE_RET_DHT22 {DHT22_OK, //DHT22 hoat dong binh thuong
              TYPE_DAT_DHT22 ;
 
 //********** Delay in micro second **********//
-static __INLINE void Delay(uint32_t micros);                    
+static __INLINE void Delay(uint32_t micros);  
+//__INLINE void Delay(uint32_t micros); 														 
 //******************************************//
 
 //********** Dem thoi gian TIMEOUT**********//
