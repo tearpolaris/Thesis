@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
+#include <stdlib.h>
 #include <stm32f4xx.h>
 #include <stm32f4xx_syscfg.h>
 #include <stm32f4xx_tim.h> //Timer Header File
@@ -61,6 +63,14 @@ void Reset_Data_DHT22(void);
 //******** Main Init and Read Data DHT22 ******//
 TYPE_DAT_DHT22 Init_Read_DHT22(void);                 
 //********************************************//
+
+//********* Convert interget to string ********//
+void Convert_Data_LCD(char convert_data[8], uint16_t raw_data);
+//*********************************************//
+
+//*********** Display Info Humid and Temperature **********//
+void Display_Info_Humid_Temp(void);
+//********************************************************//
 
 //************************ Code reference  ****************************//
  //GPIO_PinAFConfig(GPIOA, GPIO_PinSource1, GPIO_AF_TIM2);//Config pin AF as alternative function TIM2, TIM2 channel 1

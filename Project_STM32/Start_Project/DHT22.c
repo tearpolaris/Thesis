@@ -1,4 +1,5 @@
 #include "DHT22.h"
+#include "LCD.h"
 
 uint16_t dat_humid, dat_temp;
 uint8_t toogle = 0;
@@ -13,14 +14,11 @@ NVIC_InitTypeDef NVIC_Init_Struct;
 
 static __INLINE void Delay(uint32_t micros) {
 	volatile uint32_t timer = TIM2->CNT;
-
 	do {
 		/* Count timer ticks */
 		while ((TIM2->CNT - timer) == 0);
-
 		/* Increase timer */
 		timer = TIM2->CNT;
-
 		/* Decrease microseconds */
 	} while (--micros);
 }
@@ -55,15 +53,12 @@ void Init_DHT22_GPIO(void) {
 	  //Enable Clock for PORT A
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 		//Enable System  Config Controller Clock
-	 
-
 	  GPIO_DHT22.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
     GPIO_DHT22.GPIO_Speed = GPIO_Speed_100MHz;
 	  GPIO_DHT22.GPIO_OType = GPIO_OType_PP;
 	  GPIO_DHT22.GPIO_PuPd  = GPIO_PuPd_DOWN;
 	  //GPIO_DHT22.GPIO_Mode  = GPIO_Mode_AF;
 	  GPIO_DHT22.GPIO_Mode  = GPIO_Mode_OUT;
-	
 	 
 	  GPIO_Init(GPIOA, &GPIO_DHT22);
 }
@@ -98,8 +93,6 @@ void Init_TIM2(TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure) {
 
 void Init_Interrupt(void) {
 	NVIC_InitTypeDef NVIC_Init_Struct;
-	
-
 	//Noi External Line toi GPIO Source
 	//SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA , EXTI_PinSource1);
 	
@@ -125,7 +118,7 @@ void Test_Interrupt(void) {
 	GPIO_InitTypeDef GPIO_Interrupt;
 	//Enable Clock for PORT D
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+	//RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 	
 	GPIO_Interrupt.GPIO_Pin = 0xFFFF;//LED
   GPIO_Interrupt.GPIO_Speed = GPIO_Speed_100MHz;
@@ -134,8 +127,8 @@ void Test_Interrupt(void) {
 	GPIO_Interrupt.GPIO_Mode  = GPIO_Mode_OUT;
 	
 	GPIO_Init(GPIOD, &GPIO_Interrupt);
-	GPIO_Init(GPIOC, &GPIO_Interrupt);
-	GPIO_Init(GPIOB, &GPIO_Interrupt);
+	//GPIO_Init(GPIOC, &GPIO_Interrupt);
+	//GPIO_Init(GPIOB, &GPIO_Interrupt);
 	}
 
 //********* Handler Interrupt External Trigger 1 *************//
@@ -154,16 +147,12 @@ void EXTI1_IRQHandler(void) {
 					
 			      GPIO_Init(GPIOA, &GPIO_DHT22);
 			      GPIOD->BSRRL = GPIO_Pin_13;
-				}
-        /* Do your stuff when PB12 is changed */ 
-	
-			   
+				} 	   
         /* Clear interrupt flag */ 
         EXTI_ClearITPendingBit(EXTI_Line1);
 			  toogle++;
     }
-    /* Make sure that interrupt flag is set */
-	    
+    /* Make sure that interrupt flag is set */	    
 }
 
 ////Lay du lieu phan hoi tu DHT22
@@ -317,6 +306,36 @@ TYPE_DAT_DHT22 Init_Read_DHT22(void) {
 		
 		Reset_Data_DHT22();//Reset DATA DHT22
 		return DHT22_OK;
+}
+void Convert_Data_LCD(char convert_data[8], uint16_t raw_data) {
+	  char tmp;
+	  size_t length;
+		sprintf(convert_data, "%d", raw_data);
+	  length = strlen(convert_data);
+		tmp = convert_data[length-1];
+	  convert_data[length-1] = '.';
+	  convert_data[length] = tmp;
+	  convert_data[length+1] = '\0';
+}
+
+void Display_Info_Humid_Temp(void) {
+	  char temp[8], humid[8];
+	  Convert_Data_LCD(temp, dat_temp);
+	  Convert_Data_LCD(humid, dat_humid);
+	  Init_LCD();
+	
+	  //Display temperature
+	  Set_Line1();
+	  Display_Content("Nhiet do: ");
+	  Display_Content(temp);
+	  Write_Data(0x9);
+	  Write_Data(0x43);
+	
+	  //Display Humid
+	  Set_Line2();
+	  Display_Content("Do am: ");
+	  Display_Content(humid);
+	  Write_Data(0x25);
 }
 
 //************************ Code reference  ****************************//
