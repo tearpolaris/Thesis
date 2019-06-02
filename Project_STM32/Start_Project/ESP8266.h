@@ -10,6 +10,11 @@
 #define ESP8266_USART USART1
 #define USART_ESP8266_SIZE 1024
 
+#define ESP8266_MAX_AP_DETECTED 15
+#define ESP8266_MAX_CONNECTION  5
+#define ESP8266_MAX_SSID_CHAR   32
+
+
 #define ESP8266_COMMAND_IDLE           0
 #define ESP8266_COMMAND_RST            1
 #define ESP8266_COMMAND_CWJAP_SET      3
@@ -32,6 +37,54 @@
 //#define 
 //#define 
 
+typedef enum {
+    ESP8266_ECN_OPEN = 0x0,
+    ESP8266_ECN_WEP,
+    ESP8266_ECN_WPA_PSK,
+    ESP8266_ECN_WPA2_PSK,
+    ESP8266_ECN_WPA_WPA2_PSK
+} Encrypt_Method_t;
+
+typedef struct {
+    char* SSID;
+    char* pass_word;
+    uint8_t channel_ID;
+    Encrypt_Method_t encrypt_method;
+    uint8_t max_connection;
+    uint8_t hidden;
+} AP_Config_t; //use for command AT+CWJAP
+
+typedef struct {
+    Encrypt_Method_t ecn;
+    char SSID[ESP8266_MAX_SSID_CHAR];
+    int16_t RSSI;
+    uint8_t MAC[6];
+    uint8_t channel;
+    uint8_t offset;
+    uint8_t calibration;
+} ESP8266_AP_t;
+
+typedef struct 
+    char SSID[ESP8266_MAX_SSID_CHAR];
+    uint8_t MAX[6];
+    uint8_t channel;
+    uint8_t RSSI;
+} ESP8266_Connected_Wifi_t;
+
+typedef struct {
+    ESP8266_AP_t AP[ESP8266_MAX_AP_DETECTED];
+    uint8_t AP_valid;//number of valid AP
+} ESP8266_Multi_AP_t;   
+
+typedef struct {
+    uint8_t IP[4];
+    uint8_t MAC[4];
+} ESP8266_Connected_Station_t;
+
+typedef struct {
+    ESP8266_Connected_Station_t Stations[ESP8266_MAX_CONNECTION];
+    uint8_t count;
+} ESP8266_Connected_Multi_Station_t;
 
 typedef enum {
     ESP8266_WifiConnectError_Timeout = 0x1,  
@@ -68,11 +121,27 @@ typedef struct ESP8266_Str{
 	  uint32_t current_command;
     uint32_t last_received_time;
     char* command_response;
+    uint8_t STA_IP[4];
+    uint8_t STA_gateway[4];
+    uint8_t STA_netmask[4];
+    uint8_t AP_IP[4];
+    uint8_t AP_gateway[4];
+    uint8_t AP_netmask[4];
     ESP8266_Result last_result;
     ESP8266_Wifi_connect_error_t Wifi_connect_error;
     Wifi_Mode send_mode;
     Wifi_Mode mode;
+    AP_Config_t AP_Config;
+    ESP8266_Connected_Wifi_t connected_Wifi;
+    Encrypt_Method_t encrypt_method;
+    ESP8266_Connected_Multi_Station_t connected_stations;
     struct {
+        uint8_t STA_IP_is_set:1;
+        uint8_t STA_netmask_is_set:1;
+        uint8_t STA_gateway_is_set:1;
+        uint8_t AP_IP_is_set:1;
+        uint8_t AP_netmask_is_set:1;
+        uint8_t AP_gateway_is_set:1;
         uint8_t last_operation_status:1;
         uint8_t wait_for_wrapper:1; //wait for "> "
         uint8_t wifi_connected: 1;
@@ -124,4 +193,6 @@ void Connect_To_AP(char* ssid, char* password);
 ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command_str, char* start_respond);
 void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buffer, uint16_t bufflen);
 void ParseCWJAP(ESP8266_Str* ESP8266, char* received);
-								
+uint8_t Hex_To_Num(char ch);								
+uint8_t Char_Is_Hex(char ch);
+uint32_t Cal_Hex_Num(char* ptr, uint8_t* count);

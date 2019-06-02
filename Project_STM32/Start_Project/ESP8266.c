@@ -12,7 +12,8 @@
 #define ESP8266_RETURN_STATUS(ESP8266, status) \
     ESP8266->last_result = status;             \
     return status;
-     
+
+static ESP8266_Multi_AP_t ESP8266_Multi_AP;
 static Buffer_t USART_buffer;
 static uint8_t USART_data[USART_ESP8266_SIZE];
 
@@ -285,8 +286,6 @@ int32_t Buffer_Find(Buffer_t* buffer, char* string_find, uint32_t num_find) {
 	 return -1;
 }
 //***************************************************************************//
-
-
 void Init_ESP_GPIO(void) {
 	  //Enable Clock for PORT A
 	  GPIO_InitTypeDef GPIO_UART_ESP;
@@ -395,7 +394,343 @@ char* Receive_UART(USART_TypeDef* USARTx, int num_char_receive) {
 
 /************************ FUNCTION FOR ESP8266 *******************/
 //---------------------- FUNCTION ANALYZE STRING -------------------//
+uint8_t Hex_To_Num(char ch) {
+    uint8_t ret;
+    if ((ch >= '0') && (ch <= '9')) {
+        ret = ch - '0';
+    }
+    else if ((ch >= 'a') && (ch <= 'f')) {
+        ret = ch - 'a' + 10;
+    }
+    else if ((ch >= 'A') && (ch <= 'F')) {
+        ret = ch - 'A' + 10;
+    }
+    else {
+        ret = 0;
+    }
+    return ret;
+}
+
+uint8_t Char_Is_Hex(char ch) {
+    uint8_t ret;
+    if ( ((ch >= '0') && (ch <= '9'))
+         || ((ch >= 'a') && (ch <= 'f'))
+         || ((ch >= 'A') && (ch <= 'F'))) {
+        ret = 1;
+    }
+    else {
+        ret = 0;
+    }
+    return ret;
+}
+
+uint32_t Cal_Hex_Num(char* ptr, uint8_t* count) {
+    uint32_t sum = 0;
+    uint8_t hex, idx;
+
+    hex = Hex_To_Num(*ptr);
+    idx = 0;
+    while (hex) {
+        sum <<= 4;
+        sum += hex;
+        ptr++;
+        idx++;
+        hex = Hex_To_Num(*ptr);
+    }
+
+    if (count) {
+        *count = idx;
+    }
+    return sum;
+}
+
+//---------- Seperate number from string - such as channel ID in AT+CWSAP ---------//
+//---------- Variable cnt is used to for the location that is pointed by pointer
+uint32_t ParseNumber(char* ptr, uint8_t* cnt) {
+    uint32_t sum;
+    uint8_t minus_flag, i;
+
+    sum = minus_flag = i = 0;
+
+    if (*ptr == '-') {
+        ptr++;
+        minus_flag = 1;
+        i++;
+    }
+
+    while (*ptr && (CHAR_IS_NUM(*ptr))) {
+        sum = 10*sum + (CHAR_TO_NUM(*ptr));
+        ptr++;
+        i++;
+    }
+
+    if (cnt) {
+        *cnt = i;
+    }
+
+    if (minus_flag) {
+        return (0- sum);
+    }
+    else {
+        return sum;
+    }
+}
+
+//------------ Calculation MAC address                           -----------//
+//------------ Input: 1. array to save MAC address is calculated -----------//
+//------------        2. pointer of string received              -----------//
+//------------        3. Var cnt to count number of segment MAC  -----------//
+void ParseMAC(char* ptr, uint8_t* arr, uint8_t* cnt) {
+    char* hexptr;
+    uint8_t num_hex, tmp_count, sum;
+
+    num_hex = tmp_count = sum = 0;
+    hexptr = strtok(ptr, ":");//ac:ef:3d =>arr[0] = ac
+    while (hexptr != NULL) {
+        arr[num_hex++] = Cal_Hex_Num(ptr, &tmp_count);//one index of array correspond 1 number of MAC respectively
+        sum += tmp_count;//count number of character received
+        if (num_hex >= 6) {
+            break;
+        }
+        sum++;//ignore ':'
+        hexptr = strtok(ptr, ":");
+    }
+
+    if (cnt) {
+        *cnt = sum;
+    }
+}
+
+
+//------------------------------------------------------//
+//-----------   Seperate segment of IP     -------------//
+//-----------   IP: 192.168.1.2            -------------//
+//-----------   arr[0] = 192, arr[1] = 168 -------------//
+//------------------------------------------------------//
+void ParseIP(char* IP_str, uint8_t* arr, uint8_t* cnt) {
+    char* token;
+    char Data[16];
+    uint8_t num_char, idx, ct;
+
+    num_char = idx = 0;
+    memcpy(Data, IP_str, sizeof(Data) -1);
+    Data[sizeof(Data)-1] = 0;
+    token = strtok(Data, ".");
+    while (token != NULL) {
+        arr[idx++] = ParseNumber(token, &ct);
+        num_char += ct;
+
+        if (idx >= 4) {
+            break;
+        }
+
+        num_char++;//ignore '.'
+        token = strtok(NULL, ".");
+    }
+  
+    if (cnt != NULL) {
+        *cnt = num_char;
+    }
+}
+
+void ParseCWSAP(ESP8266_Str* ESP8266, char* received) {
+    char* ptr;
+    uint8_t i, cnt;
+
+    ptr = received;
+    i = 0;
+
+    while(*ptr) {
+        if (*ptr == ':') {
+            break;
+        }
+    }
+    if (*ptr == 0) {
+        return;
+    }
+    ptr++;//ignore ":"
+    while(*ptr && !((*ptr != '"') && (*(ptr+1) != ',') && (*(ptr+2) != '"'))) {
+        ESP8266->AP_Config.SSID[i++] = *ptr;
+        ptr++;
+    }
+    ESP8266->AP_Config.SSID[i] = 0;
+    i = 0;
+   
+    ptr += 3;
+    while(*ptr && !((*ptr != '"') && (*(ptr+1) != ','))) {
+        ESP8266->AP_Config.pass_word[i++] = *ptr;
+        ptr++;
+    }
+    ESP8266->AP_Config.pass_word[i++] = 0;
+
+    ptr += 2;//ignore ','
+    ESP8266->AP_Config.channel_ID = ParseNumber(ptr, &cnt);
+    
+    ptr += cnt + 1; //ignore character of channel ID and ','
+    ESP8266->AP_Config.encrypt_method =  (Encrypt_Method_t)ParseNumber(ptr, &cnt);
+ 
+    ptr += cnt + 1;//ignore character of encrytion method and ','
+    ESP8266->AP_Config.max_connection = ParseNumber(ptr, &cnt);
+
+    ptr += cnt + 1;
+    ESP8266->AP_Config.hidden = ParseNumber(ptr, &cnt);
+}
+
+//-----------------------------------------------------------------------------------------//   
+//------------------ Get IP and Address of Station which is connect to ESP8266 ------------//
+//------------------ ESP8266 is soft access point                              ------------//
+//-----------------------------------------------------------------------------------------//   
+void ParseCWLIF(ESP8266_Str* ESP8266, char* received) { 
+    uint8_t count_connected, cnt;
+
+    count_connected = ESP8266->connected_stations.count;
+    if (count_connected  > ESP8266_MAX_CONNECTION) {
+        return;
+    }
+
+    ParseIP(received, ESP8266->connected_stations.Stations[count_connected].IP, &cnt);
+    ParseMAC(&received[cnt+1], ESP8266->connected_stations.Stations[count_connected].MAC, NULL);
+
+    ESP8266->connected_stations.count++;
+}
+
+void ParseCWLAP(ESP8266_Str* ESP8266, char* received) {
+    uint8_t part, start;
+    char* ptr;
+
+    part = 0;
+    start = 7;//+CWLAP:  <----- position 7
+    ptr = strtok(&received[start], ",");
+    while (ptr != NULL) {
+        switch (part) {//take seperately part
+            case 0:
+                ESP8266_Multi_AP.AP[ESP8266_Multi_AP.AP_valid].ecn = (Encrypt_Method_t)ParseNumber(ptr, NULL);
+                break;
+            case 1:
+                ptr++;
+                ptr[strlen(ptr) -1] = 0;
+                strcpy(ESP8266_Multi_AP.AP[ESP8266_Multi_AP.AP_valid].SSID, ptr);
+                break;
+            case 2:
+                ESP8266_Multi_AP.AP[ESP8266_Multi_AP.AP_valid].RSSI = ParseNumber(ptr, NULL);
+                break;
+            case 3:
+                ptr++;
+                ptr[strlen(ptr) -1] = 0;
+                ParseMAC(ptr, ESP8266_Multi_AP.AP[ESP8266_Multi_AP.AP_valid].MAC , NULL);
+                break;          
+            case 4: 
+                ESP8266_Multi_AP.AP[ESP8266_Multi_AP.AP_valid].channel = ParseNumber(ptr, NULL);
+                break;
+            case 5: 
+                ESP8266_Multi_AP.AP[ESP8266_Multi_AP.AP_valid].offset = ParseNumber(ptr, NULL);
+                break;
+            case 6: 
+                ESP8266_Multi_AP.AP[ESP8266_Multi_AP.AP_valid].calibration = ParseNumber(ptr, NULL);
+                break;
+            default:
+                break;
+        }
+        ptr = strtok(NULL, ",");
+    }
+    ESP8266_Multi_AP.AP_valid++;
+}
+
+void ParseCIPSTA(ESP8266_Str* ESP8266, char* received) {
+    uint8_t pos, type, command;
+
+    if (strncmp(received, "+CIPSTA_CUR:ip", 14)) {
+        pos = 14;
+        type = 1;
+        command = ESP8266_COMMAND_CIPSTA;
+    }
+    else if (strncmp(received, "+CIPSTA_CUR:gateway", 19)) {
+        pos = 19;
+        type = 2;
+        command = ESP8266_COMMAND_CIPSTA;
+    }
+    else if (strncmp(received, "+CIPSTA_CUR:netmask", 19)) {
+        pos = 19;
+        type = 3;
+        command = ESP8266_COMMAND_CIPSTA;
+    }
+    else if (strncmp(received, "+CIPAP_CUR:ip", 13)) {
+        pos = 9;
+        type = 1;
+    }
+    else if (strncmp(received, "+CIPAP_CUR:gateway", 18)) {
+        pos = 18;
+        type = 2;
+    }
+    else if (strncmp(received, "+CIPAP_CUR:netmask", 18)) {
+        pos = 18;
+        type = 3;
+    }
+    else {
+        return;
+    }
+
+    if (command == ESP8266_COMMAND_CIPSTA) {
+        switch(type) {
+            case 1:
+                ParseIP(&received[pos+2], ESP8266->STA_IP, NULL);
+                ESP8266->Flags.STA_IP_is_set = 1;
+                break;
+            case 2:
+                ParseIP(&received[pos+2], ESP8266->STA_gateway, NULL);
+                ESP8266->Flags.STA_gateway_is_set = 1;
+                break;
+            case 3:
+                ParseIP(&received[pos+2], ESP8266->STA_netmask, NULL);
+                ESP8266->Flags.STA_netmask_is_set = 1;
+                break; 
+            default:
+                break;              
+        }
+    }
+    else {
+      switch(type) {
+            case 1:
+                ParseIP(&received[pos+2], ESP8266->AP_IP, NULL);
+                ESP8266->Flags.AP_IP_is_set = 1;
+                break;
+            case 2:
+                ParseIP(&received[pos+2], ESP8266->AP_gateway, NULL);
+                ESP8266->Flags.AP_gateway_is_set = 1;
+                break;
+            case 3:
+                ParseIP(&received[pos+2], ESP8266->AP_netmask, NULL);
+                ESP8266->Flags.AP_netmask_is_set = 1;
+                break;               
+            default:
+                break;
+        }
+    }
+            
+}
+//------------------------------------------------------------------//
+//--------------- Connect to an access point - AP ------------------//
+//------ Response: +CWJAP_CUR:<ssid>,<bssid>,<channel>,<rssi> ------//
+
 void ParseCWJAP(ESP8266_Str* ESP8266, char* received) {
+    char* ptr = received;
+    uint8_t i, cnt;
+
+    i = 0;
+    if (!strstr(received, "+CWJAP_")) {
+        return;
+    }
+
+    while (*ptr && *ptr != '"') {
+       ptr++;
+    }
+    if (*ptr == NULL) {
+        return;
+    }
+    ptr++;//ignore "
+    while (*ptr && ((*ptr != '"') || (*ptr != ',') || (*ptr != '"'))) {
+        ESP8266-> connected_Wifi.SSID[i++] = *ptr;
+    }
 
 }
 //------------------------------------------------------------------//
