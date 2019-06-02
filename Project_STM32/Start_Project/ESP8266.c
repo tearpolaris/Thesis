@@ -711,7 +711,7 @@ void ParseCIPSTA(ESP8266_Str* ESP8266, char* received) {
 //------------------------------------------------------------------//
 //--------------- Connect to an access point - AP ------------------//
 //------ Response: +CWJAP_CUR:<ssid>,<bssid>,<channel>,<rssi> ------//
-
+//------------------------------------------------------------------//
 void ParseCWJAP(ESP8266_Str* ESP8266, char* received) {
     char* ptr = received;
     uint8_t i, cnt;
@@ -731,6 +731,17 @@ void ParseCWJAP(ESP8266_Str* ESP8266, char* received) {
     while (*ptr && ((*ptr != '"') || (*ptr != ',') || (*ptr != '"'))) {
         ESP8266-> connected_Wifi.SSID[i++] = *ptr;
     }
+
+    ESP8266->connected_Wifi.SSID[i] = 0;
+    ptr += 3;
+ 
+    ParseMAC(ptr, ESP8266->connected_Wifi.MAX, &cnt);
+    ptr += cnt + 2;//ignore '"' and ','
+
+    ESP8266->connected_Wifi.channel = ParseNumber(ptr, &cnt);
+    ptr += cnt + 1;//ignore amount of number character and ','
+
+    ESP8266->connected_Wifi.RSSI = ParseNumber(ptr, &cnt);   
 
 }
 //------------------------------------------------------------------//
@@ -798,6 +809,16 @@ ESP8266_Result ESP8266_Update(ESP8266_Str* ESP8266) {
 }
 
 void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buffer, uint16_t bufflen) {
+
+    if (!strcmp(received, "WIFI CONNECTED")) {
+        ESP8266->Flags.wifi_connected = 1;
+        // ESP8266_Callback_Wifi_Connected//Callback WifiConnected
+    }
+    else if (!strcmp(received, "WIFI DISCONNECT")) {
+        ESP8266->Flags.wifi_connected = 0;
+        ESP8266->Flags.wifi_got_ip = 0;
+        memset((uint8_t*)&ESP8266->connected_Wifi, 0, sizeof(ESP8266->connected_Wifi)); 
+    }
     if ((bufflen == 2) && (received[0] == '\r') && (received[1] == '\n')) {
         return;
     }

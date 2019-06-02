@@ -64,7 +64,7 @@ typedef struct {
     uint8_t calibration;
 } ESP8266_AP_t;
 
-typedef struct 
+typedef struct {
     char SSID[ESP8266_MAX_SSID_CHAR];
     uint8_t MAX[6];
     uint8_t channel;
