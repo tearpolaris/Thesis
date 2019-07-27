@@ -121,12 +121,14 @@ typedef struct ESP8266_Str{
 	  uint32_t current_command;
     uint32_t last_received_time;
     char* command_response;
+    uint8_t STA_MAC[4];
     uint8_t STA_IP[4];
     uint8_t STA_gateway[4];
     uint8_t STA_netmask[4];
     uint8_t AP_IP[4];
     uint8_t AP_gateway[4];
     uint8_t AP_netmask[4];
+    uint8_t AP_MAC[4];
     ESP8266_Result last_result;
     ESP8266_Wifi_connect_error_t Wifi_connect_error;
     Wifi_Mode send_mode;
@@ -182,17 +184,33 @@ void Transmit_UART_Enable(USART_TypeDef* USARTx,  FunctionalState NewState);
 void Clear_UART_TxE(USART_TypeDef* USARTx);
 void Init_ESP_GPIO(void);
 void Transmit_UART(USART_TypeDef* USARTx, uint8_t* dat, uint16_t count);
+char UART_GetChar (USART_TypeDef* USARTx);
 char* Receive_UART(USART_TypeDef* USARTx, int num_char_receive);
 void  Init_USART1_RXNE_Interrupt(USART_TypeDef* USARTx);
 /**************************************************************************/
-/**************************************************************************/
 
+
+/**************************** ESP8266 FUNCTION *****************************/
+/***************************************************************************/	
+void Initialize_ESP8266(ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_Update(ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_WaitReady(ESP8266_Str* ESP8266);
 void Set_Wifi_Mode(Wifi_Mode mode);
 void Connect_To_AP(char* ssid, char* password);
 ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command_str, char* start_respond);
+
 void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buffer, uint16_t bufflen);
 void ParseCWJAP(ESP8266_Str* ESP8266, char* received);
+void ParseCIPSTA(ESP8266_Str* ESP8266, char* received);
+void ParseCWLAP(ESP8266_Str* ESP8266, char* received);
+void ParseCWLIF(ESP8266_Str* ESP8266, char* received);
+void ParseCWSAP(ESP8266_Str* ESP8266, char* received);
+void ParseIP(char* IP_str, uint8_t* arr, uint8_t* cnt);
+void ParseMAC(char* ptr, uint8_t* arr, uint8_t* cnt);
+
 uint8_t Hex_To_Num(char ch);								
 uint8_t Char_Is_Hex(char ch);
 uint32_t Cal_Hex_Num(char* ptr, uint8_t* count);
+uint32_t ParseNumber(char* ptr, uint8_t* cnt);
+/***************************************************************************/	
