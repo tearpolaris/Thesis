@@ -335,15 +335,6 @@ void Init_UART_Config(void) {
 	 USART_Init(USART1, &Init_UART_Str);
 	 USART1->CR1 |= 0x20;//Enable Interrupt UART
 	 USART_Cmd(USART1, ENABLE);
-	 //while (1) {	
-	     /*****  Code received data *******/
-	     //USART_SendData (USART1, 0x41);
-			 //while (!USART_GetFlagStatus(USART1, USART_FLAG_RXNE)) {
-	     //}
-			 // received_data[1] = USART_ReceiveData(USART1);
-	
-	     /********************************/
-	 //USART_Cmd(USART1, DISABLE);
 }
 
 void Transmit_UART(USART_TypeDef* USARTx, uint8_t* dat, uint16_t count) {
@@ -973,18 +964,88 @@ void Initialize_ESP8266(ESP8266_Str* ESP8266) {
 //------------------ Set Mode Wifi *-------------//      
 //-----------------------------------------------//
 void Set_Wifi_Mode(Wifi_Mode mode) {
-	assert_param(IS_WIFI_MODE(mode));
-	char sbuf[20];
-	sprintf(sbuf, "AT+CWMODE_CUR=%d", mode);
-
+	  assert_param(IS_WIFI_MODE(mode));
+	  char sbuf[20];
+	  sprintf(sbuf, "AT+CWMODE_CUR=%d", mode);
+    Transmit_UART(USART1, (uint8_t*)sbuf, strlen(sbuf));
 }
 
+//*****************************************************//
 //*************** Connect to Access Point *************//
 //******************************************************
 
-void Connect_To_AP(char* ssid, char* password) {
-	 char sbuf[30];
-	 sprintf(sbuf, "AT+CWJAP_CUR=%s,%s", ssid, password);
+ ESP8266_Wifi_connect_error_t Connect_To_AP(char* ssid, char* password, Wifi_Mode mode,  ESP8266_Str* ESP8266) {
+	  char sbuf[30];
+    unsigned char access_mode;
+    //Check ESP8266 is access point or station
+    Set_Wifi_Mode(mode);
+
+    //Wait for response
+
+    strcpy(sbuf, "AT+CWMODE_CUR?\r\n");
+    Transmit_UART(USART1, (uint8_t*)sbuf, strlen(sbuf));
+    //Wait for response
+
+    if (ESP8266->mode == SOFTAP_MODE) {
+        printf("Error! ESP8266 must be in SoftAPMode or mix\n");
+        return ESP8266_SetAP_Connect_AP;
+    }
+
+    //Connect to access point
+	  sprintf(sbuf, "AT+CWJAP_CUR=%s,%s", ssid, password);
+    Transmit_UART(USART1, (uint8_t*)sbuf, strlen(sbuf));
+    return ESP8266_WifiConnect_OK;
 }
 
-/********************************************************************/
+/******************************************************/
+
+ESP8266_Wifi_connect_error_t Establish_TCP(char* domain_name, ESP8266_Str* ESP8266) {
+    char sbuf[40], i;
+
+    i = 3;
+    if (ESP8266->Wifi_connect_error != ESP8266_WifiConnect_OK) {
+        return ESP8266->Wifi_connect_error;	
+    }
+
+    //-----------------------------------------//
+    //Can check xem da ket noi truoc do hay chua
+    //---------------------------------------//
+    sprintf(sbuf, "AT+CIPDOMAIN=%s", domain_name);
+
+    while (i) {
+        Transmit_UART(USART1, (uint8_t*)sbuf, strlen(sbuf));
+
+        //Wait for response
+        if (strncmp(sbuf, "DNS Fail", 8)) {
+            if (!i) {
+                printf("Error! DNS Fail. Please check domain name again!\n");
+                ESP8266->Wifi_connect_error = ESP8266_DNS_Connect_Fail;
+                ESP8266->Flags.last_operation_status = 0;
+                ESP8266->Flags.DNS_connect_success = 0;
+            }
+            i--;
+        }
+        else if (strcmp(sbuf, "OK")) {
+            printf("Resolve domain name success!\n");
+            ESP8266->Flags.DNS_connect_success = 1;
+            break;
+        }
+        else {
+            //T.B.D
+        }       
+    }
+
+    if (ESP8266->Flags.DNS_connect_success) {
+    //----------- Thiet lap ket noi TCP ----------//
+    }
+    //Wait for response
+        
+    return ESP8266->Wifi_connect_error;
+}
+
+void Send_data_TCP(ESP8266_Str* ESP8266, char* data, int count) {
+//Send data to Web Browser for display, or GET HTTP 1.1
+}
+
+void Web_Content_To_Browser(void) {
+}

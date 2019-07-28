@@ -87,16 +87,27 @@ typedef struct {
 } ESP8266_Connected_Multi_Station_t;
 
 typedef enum {
+    ESP8266_WifiConnect_OK = 0x0,
     ESP8266_WifiConnectError_Timeout = 0x1,  
     ESP8266_WifiConnectError_WrongPassword = 0x2,
     ESP8266_WifiConnectError_APNotFound = 0x3,
-    ESP8266_WifiConnectError_Failed = 0x4
+    ESP8266_WifiConnectError_Failed = 0x4,
+    ESP8266_SetAP_Connect_AP = 0x5,
+    ESP8266_SetSTA_Connect_STA = 0x6,
+    ESP8266_DNS_Connect_Fail = 0x7
 } ESP8266_Wifi_connect_error_t;
 
 typedef enum Wifi_Mode {STATION_MODE = 1, //Station mode access to AP
                         SOFTAP_MODE,      //AP devices connect to
                         AP_STATION_MODE} //Combine Station and AP
              Wifi_Mode; 
+
+typedef enum Error_Type {
+    NO_ERR = 0, //No error
+    ERR_SET_AP_CONNECT_AP = 0x1, //Setting wifi mode access point but connecting to access point
+    ERR_SET_STA_CONNECT_STA  = 0x2,
+    DNS_FAIL  = 0x3
+} Error_Type;
 
 typedef struct Buffer_type {
   uint32_t size; //
@@ -148,6 +159,7 @@ typedef struct ESP8266_Str{
         uint8_t wait_for_wrapper:1; //wait for "> "
         uint8_t wifi_connected: 1;
         uint8_t wifi_got_ip:1;
+        uint8_t DNS_connect_success:1;
     }Flags;
 } ESP8266_Str;
 	                         
