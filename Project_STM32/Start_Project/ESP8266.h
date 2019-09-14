@@ -1,6 +1,7 @@
 //OVER8 = 0 => Oversampling by 16, giam sai so do lech clock
 //ONEBIT = 0 => Lay mau 3 lan tai trung tam cua bit
 #include <stm32f4xx_usart.h>
+#include <stm32f4xx_tim.h> 
 #include <stdlib.h>
 
 #define BUFFER_INITIALIZED 0x1
@@ -9,8 +10,10 @@
 #define UART_TRANS_ENABLE 0x08
 #define ESP8266_USART USART1
 #define USART_ESP8266_SIZE 1024
+#define ESP8266_CONNECTION_BUFFER_SIZE  5096
 
 #define ESP8266_MAX_AP_DETECTED 15
+#define ESP8266_MAX_CONNECTIONS 5
 #define ESP8266_MAX_CONNECTION  5
 #define ESP8266_MAX_SSID_CHAR   32
 
@@ -27,6 +30,10 @@
 #define ESP8266_COMMAND_CIPSTA         10
 #define ESP8266_COMMAND_CIPAP          11
 #define ESP8266_COMMAND_CWMODE         12
+#define ESP8266_COMMAND_SEND_DATA      13
+#define ESP8266_COMMAND_USART          14
+#define ESP8266_COMMAND_CIPDOMAIN      15
+#define ESP8266_COMMAND_CIPSTART       16
 //#define 
 //#define 
 //#define 
@@ -37,6 +44,8 @@
 //#define 
 //#define 
 
+TIM_TimeBaseInitTypeDef* TIM_Base_Init;
+
 typedef enum {
     ESP8266_ECN_OPEN = 0x0,
     ESP8266_ECN_WEP,
@@ -44,6 +53,32 @@ typedef enum {
     ESP8266_ECN_WPA2_PSK,
     ESP8266_ECN_WPA_WPA2_PSK
 } Encrypt_Method_t;
+
+typedef enum {
+    ESP8266_ConnectType_TCP = 0x0,
+    ESP8266_Connect_Type_SSL
+} ESP8266_Connect_Type;
+
+typedef struct {
+    uint8_t active;
+    uint8_t number;
+    uint8_t cilent;
+    uint16_t remote_port;
+    uint8_t remote_IP[4];
+    ESP8266_Connect_Type connect_type;
+    uint32_t byte_received;
+    uint32_t total_byte_received;
+    uint8_t wait_for_wrapper;
+    uint8_t wait_for_respond;
+    char* data;
+    uint16_t data_size;
+    uint8_t last_part;
+    uint32_t content_length;
+    char* name;
+    uint8_t header_done;
+    uint8_t first_packet;
+    uint8_t last_activity;
+} ESP8266_Connection_t;
 
 typedef struct {
     char* SSID;
@@ -66,7 +101,7 @@ typedef struct {
 
 typedef struct {
     char SSID[ESP8266_MAX_SSID_CHAR];
-    uint8_t MAX[6];
+    uint8_t MAC[6];
     uint8_t channel;
     uint8_t RSSI;
 } ESP8266_Connected_Wifi_t;
@@ -94,7 +129,9 @@ typedef enum {
     ESP8266_WifiConnectError_Failed = 0x4,
     ESP8266_SetAP_Connect_AP = 0x5,
     ESP8266_SetSTA_Connect_STA = 0x6,
-    ESP8266_DNS_Connect_Fail = 0x7
+    ESP8266_DNS_Connect_Fail = 0x7,
+    ESP8266_Error_TCP_Connection = 0x8,
+    ESP8266_Error_SendData_Fail = 0x9
 } ESP8266_Wifi_connect_error_t;
 
 typedef enum Wifi_Mode {STATION_MODE = 1, //Station mode access to AP
@@ -131,6 +168,8 @@ typedef struct ESP8266_Str{
     uint32_t timeout;
 	  uint32_t current_command;
     uint32_t last_received_time;
+    uint32_t total_byte_received;
+    uint32_t total_byte_sent;
     char* command_response;
     uint8_t STA_MAC[4];
     uint8_t STA_IP[4];
@@ -140,6 +179,7 @@ typedef struct ESP8266_Str{
     uint8_t AP_gateway[4];
     uint8_t AP_netmask[4];
     uint8_t AP_MAC[4];
+    uint8_t DNS_IP[4];//IP address for a DNS name
     ESP8266_Result last_result;
     ESP8266_Wifi_connect_error_t Wifi_connect_error;
     Wifi_Mode send_mode;
@@ -148,7 +188,9 @@ typedef struct ESP8266_Str{
     ESP8266_Connected_Wifi_t connected_Wifi;
     Encrypt_Method_t encrypt_method;
     ESP8266_Connected_Multi_Station_t connected_stations;
-    struct {
+    ESP8266_Connection_t connection[ESP8266_MAX_CONNECTIONS];
+    ESP8266_Connection_t* send_data_connection;
+    union {
         uint8_t STA_IP_is_set:1;
         uint8_t STA_netmask_is_set:1;
         uint8_t STA_gateway_is_set:1;
@@ -201,7 +243,18 @@ char* Receive_UART(USART_TypeDef* USARTx, int num_char_receive);
 void  Init_USART1_RXNE_Interrupt(USART_TypeDef* USARTx);
 /**************************************************************************/
 
+/*************************** COUNTER FUNCTION ********************************/		
+/***************************************************************************/					
+void Init_Counter_ESP8266(TIM_TypeDef* TIMx);//Frequency is 40 MHz
+void Init_Interrupt_TIM3(void);
+/**************************************************************************/
 
+/*************************** CALL BACK USER FUNCTION ***********************/		
+void ESP8266_CallBack_DNS_Fail (ESP8266_Str* ESP8266);
+void ESP8266_CallBack_TCP_Connection_Fail(ESP8266_Str* ESP8266);
+void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266);
+/***************************************************************************/	
+	
 /**************************** ESP8266 FUNCTION *****************************/
 /***************************************************************************/	
 void Initialize_ESP8266(ESP8266_Str* ESP8266);
@@ -212,6 +265,7 @@ void Set_Wifi_Mode(Wifi_Mode mode);
 void Connect_To_AP(char* ssid, char* password);
 ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command_str, char* start_respond);
 
+void Process_SendData(ESP8266_Str* ESP8266);
 void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buffer, uint16_t bufflen);
 void ParseCWJAP(ESP8266_Str* ESP8266, char* received);
 void ParseCIPSTA(ESP8266_Str* ESP8266, char* received);
