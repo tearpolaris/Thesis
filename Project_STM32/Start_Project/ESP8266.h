@@ -20,6 +20,7 @@
 
 #define ESP8266_COMMAND_IDLE           0
 #define ESP8266_COMMAND_RST            1
+#define ESP8266_COMMAND_AT             2
 #define ESP8266_COMMAND_CWJAP_SET      3
 #define ESP8266_COMMAND_CWJAP_GET      4
 #define ESP8266_COMMAND_CWLAP          5
@@ -34,6 +35,7 @@
 #define ESP8266_COMMAND_USART          14
 #define ESP8266_COMMAND_CIPDOMAIN      15
 #define ESP8266_COMMAND_CIPSTART       16
+#define ESP8266_COMMAND_CIPMUX         17
 //#define 
 //#define 
 //#define 
@@ -65,8 +67,8 @@ typedef struct {
     uint8_t cilent;
     uint16_t remote_port;
     uint8_t remote_IP[4];
-    ESP8266_Connect_Type connect_type;
-    uint32_t byte_received;
+    ESP8266_Connect_Type connect_type;//connect type is TCP or SSL
+    uint32_t byte_received;//number of bytes received
     uint32_t total_byte_received;
     uint8_t wait_for_wrapper;
     uint8_t wait_for_respond;
@@ -74,15 +76,15 @@ typedef struct {
     uint16_t data_size;
     uint8_t last_part;
     uint32_t content_length;
-    char* name;
+    //char* name; reserved for cilent 
     uint8_t header_done;
     uint8_t first_packet;
     uint8_t last_activity;
 } ESP8266_Connection_t;
 
 typedef struct {
-    char* SSID;
-    char* pass_word;
+    char SSID[32];
+    char pass_word[64];
     uint8_t channel_ID;
     Encrypt_Method_t encrypt_method;
     uint8_t max_connection;
@@ -156,11 +158,13 @@ typedef struct Buffer_type {
 } Buffer_t;
 	
 typedef enum ESP8266_Result {ESP8266_OK = 0,
+                             ESP8266_ERROR,
 	                           ESP8266_BUSY, //In busy
 	                           ESP8266_TIMEOUT, //Command Timeout
-	                           ESP8266_INVALID_PARAMETER,
-                             ESP8266_MALLOC_ERR}
-             ESP8266_Result;
+	                           ESP8266_INVALID_PARAMETER,//Invalid parameter
+                             ESP8266_DEVICE_NOT_CONNECTED,//Cannot communicate with ESP8266
+                             ESP8266_MALLOC_ERR
+} ESP8266_Result;
 
 typedef struct ESP8266_Str{
     uint32_t time;
@@ -170,6 +174,7 @@ typedef struct ESP8266_Str{
     uint32_t last_received_time;
     uint32_t total_byte_received;
     uint32_t total_byte_sent;
+    uint32_t baud_rate;
     char* command_response;
     uint8_t STA_MAC[4];
     uint8_t STA_IP[4];
@@ -233,7 +238,7 @@ void Buffer_Reset(Buffer_t* buffer);
 
 /*************************** USART FUNCTION ********************************/		
 /***************************************************************************/					
-void Init_UART_Config(void);
+void Init_UART_Config(uint32_t baud_rate);
 void Transmit_UART_Enable(USART_TypeDef* USARTx,  FunctionalState NewState);
 void Clear_UART_TxE(USART_TypeDef* USARTx);
 void Init_ESP_GPIO(void);
@@ -257,8 +262,8 @@ void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266);
 	
 /**************************** ESP8266 FUNCTION *****************************/
 /***************************************************************************/	
-void Initialize_ESP8266(ESP8266_Str* ESP8266);
-ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266);
+void Initialize_data_ESP8266(ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266, uint32_t baud_rate);
 ESP8266_Result ESP8266_Update(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_WaitReady(ESP8266_Str* ESP8266);
 void Set_Wifi_Mode(Wifi_Mode mode);

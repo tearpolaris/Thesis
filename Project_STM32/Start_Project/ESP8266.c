@@ -19,6 +19,7 @@ unsigned char start_track = 0;
 static ESP8266_Multi_AP_t ESP8266_Multi_AP;
 static Buffer_t USART_buffer;
 static uint8_t USART_data[USART_ESP8266_SIZE];
+static uint32_t ESP8266_baud_rate[] = {9600,  57600, 115200, 921600};
 
 
 /******************************** BUFFER FUNCTION **************************
@@ -336,12 +337,12 @@ void USART1_IRQHandler(void) {
     }
 }
 
-void Init_UART_Config(void) {
+void Init_UART_Config(uint32_t baud_rate) {
 	RCC_APB2PeriphClockCmd (RCC_APB2Periph_USART1, ENABLE);
 	USART_InitTypeDef Init_UART_Str;
 	
 	USART_StructInit(&Init_UART_Str);
-	Init_UART_Str.USART_BaudRate = 115200;
+	Init_UART_Str.USART_BaudRate = baud_rate;
 	USART_Init(USART1, &Init_UART_Str);
 	USART1->CR1 |= 0x20;//Enable Interrupt UART
 	USART_Cmd(USART1, ENABLE);
@@ -709,10 +710,11 @@ void ParseCIPSTA(ESP8266_Str* ESP8266, char* received) {
     }
             
 }
-//------------------------------------------------------------------//
-//--------------- Connect to an access point - AP ------------------//
-//------ Response: +CWJAP_CUR:<ssid>,<bssid>,<channel>,<rssi> ------//
-//------------------------------------------------------------------//
+//******************************************************************//
+//****** Connect to an access point - AP                      ******//
+//****** Response: +CWJAP_CUR:<ssid>,<bssid>,<channel>,<rssi> ******//
+//****** Example: +CJWAP_CUR="abc","ca:d7:19:d8:a6:44",4,2    ******//
+//******************************************************************//
 void ParseCWJAP(ESP8266_Str* ESP8266, char* received) {
     char* ptr = received;
     uint8_t i, cnt;
@@ -729,28 +731,79 @@ void ParseCWJAP(ESP8266_Str* ESP8266, char* received) {
         return;
     }
     ptr++;//ignore "
-    while (*ptr && ((*ptr != '"') || (*ptr != ',') || (*ptr != '"'))) {
+    while (*ptr && ((*ptr != '"') || (*(ptr+1) != ',') || (*(ptr+2) != '"'))) {
         ESP8266-> connected_Wifi.SSID[i++] = *ptr;
     }
 
     ESP8266->connected_Wifi.SSID[i] = 0;
     ptr += 3;
  
-    ParseMAC(ptr, ESP8266->connected_Wifi.MAX, &cnt);
+    ParseMAC(ptr, ESP8266->connected_Wifi.MAC, &cnt);
     ptr += cnt + 2;//ignore '"' and ','
 
     ESP8266->connected_Wifi.channel = ParseNumber(ptr, &cnt);
     ptr += cnt + 1;//ignore amount of number character and ','
 
     ESP8266->connected_Wifi.RSSI = ParseNumber(ptr, &cnt);   
-
 }
-//------------------------------------------------------------------//
-ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266) {
+
+//******************************************************************//
+//********      Function test ESP8266 initialization      **********//
+//******************************************************************//
+ESP8266_Result ESP8266_Multi_Connection(ESP8266_Str* ESP8266, uint8_t mux) {
+    char ch_mux = (char)(mux + '0');
+
+    ESP8266_CHECK_IDLE(ESP8266);
+    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPMUX=", strlen("AT+CIPMUX"));
+    Transmit_UART(ESP8266_USART, (uint8_t*)&ch_mux, 1);   
+    Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
+  
+    if (Send_Command(ESP8266, ESP8266_COMMAND_CIPMUX, NULL, NULL) != ESP8266_OK) {
+        return ESP8266->last_result;
+    }
+    ESP8266_WaitReady(ESP8266);
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
+}
+
+
+//******************************************************************//
+//******** Initialize buffer and data structure of ESP8266 *********//
+//******************************************************************//
+ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266, uint32_t baud_rate) {
     if(Buffer_Init(&USART_buffer, USART_ESP8266_SIZE, USART_data)) {
         return ESP8266_MALLOC_ERR;
     }
+    Initialize_data_ESP8266(ESP8266);
+    Init_UART_Config(baud_rate);
+    ESP8266->timeout = 1000;
     Send_Command(ESP8266, ESP8266_COMMAND_RST, "AT+RST\r\n", "ready\r\n");
+    ESP8266_WaitReady(ESP8266);
+    if (!ESP8266->Flags.last_operation_status) {
+        for (int i=0; i < sizeof(ESP8266_baud_rate)/sizeof(ESP8266_baud_rate[0]); i++) {
+            Init_UART_Config(ESP8266_baud_rate[i]);
+            ESP8266->timeout = 1000;
+            Send_Command(ESP8266, ESP8266_COMMAND_RST, "AT+RST\r\n", "ready\r\n");
+            ESP8266_WaitReady(ESP8266);
+            if (ESP8266->Flags.last_operation_status) {
+                ESP8266->baud_rate = ESP8266_baud_rate[i];
+                break;
+            }
+        }
+    }
+
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_DEVICE_NOT_CONNECTED);
+    }
+  
+    ESP8266->timeout = 30000;
+    Send_Command(ESP8266, ESP8266_COMMAND_AT, "AT\r\n", "OK\r\n");
+    ESP8266_WaitReady(ESP8266);
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_DEVICE_NOT_CONNECTED);
+    }   
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
    
 }
@@ -776,6 +829,8 @@ ESP8266_Result ESP8266_WaitReady(ESP8266_Str* ESP8266) {
     do {
         if(ESP8266->Flags.wait_for_wrapper) {
             if(Buffer_Find(&USART_buffer, "> ", 2) >= 0) {
+                track_time_out = 0;
+                start_track = 0;
                 break;
             }
         }
@@ -813,7 +868,7 @@ ESP8266_Result ESP8266_Update(ESP8266_Str* ESP8266) {
         }
     }
 
-  //-----------------Baud rate of USRAT was changed---------------//
+  //-----------------Baud rate of USART was changed---------------//
     if (ESP8266->current_command == ESP8266_COMMAND_USART) {
         if (Buffer_Find(&USART_buffer, "OK\r\n", 4) >= 0) {
             Buffer_Reset(&USART_buffer);
@@ -1023,8 +1078,8 @@ void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buff
         ESP8266->Flags.last_operation_status = 1;
     }
     if ((!strcmp(received, "ERROR\r\n")) || strcmp(received, "busy p...\r\n")) {
-        ESP8266->Flags.last_operation_status = 1;
-        ESP8266->current_command = 0;
+        ESP8266->Flags.last_operation_status = 0;
+        ESP8266->current_command = ESP8266_COMMAND_IDLE;
     }
 
     if (!strcmp(received, "SEND OK\r\n")) {
@@ -1052,12 +1107,15 @@ void ESP8266_CallBack_TCP_Connection_Fail(ESP8266_Str* ESP8266) {
 
 //------------------ Initialize ESP8266 ------------//
 //---------- Reset all variables to 0 --------------//
-void Initialize_ESP8266(ESP8266_Str* ESP8266) {
+void Initialize_data_ESP8266(ESP8266_Str* ESP8266) {
     ESP8266->time = 0;
 	  ESP8266->start_time = 0;
     ESP8266->timeout = 0;
 	  ESP8266->current_command = 0;
     ESP8266->last_received_time = 0;
+    ESP8266->total_byte_received = 0;
+    ESP8266->total_byte_sent = 0;
+
     if (ESP8266->command_response == NULL) {
         ESP8266->command_response = (char*)malloc(30 * sizeof(char));
     }
@@ -1074,6 +1132,10 @@ void Initialize_ESP8266(ESP8266_Str* ESP8266) {
         ESP8266->STA_netmask[i] = 0;
     }
 
+    for (int i = 0; i < sizeof(ESP8266->STA_MAC)/sizeof(ESP8266->STA_MAC[0]); i++) {
+        ESP8266->STA_MAC[i] = 0;
+    }    
+
     for (int i = 0; i < sizeof(ESP8266->AP_IP)/sizeof(ESP8266->AP_IP[0]); i++) {
         ESP8266->AP_IP[i] = 0;
     }
@@ -1086,6 +1148,15 @@ void Initialize_ESP8266(ESP8266_Str* ESP8266) {
         ESP8266->AP_netmask[i] = 0;
     }
 
+    for (int i = 0; i < sizeof(ESP8266->AP_MAC)/sizeof(ESP8266->AP_MAC[0]); i++) {
+        ESP8266->AP_MAC[i] = 0;
+    }
+
+    
+    ESP8266->send_data_connection = (ESP8266_Connection_t*)malloc(1*sizeof(ESP8266_Connection_t));
+    ESP8266->last_result = 0;
+    ESP8266->Wifi_connect_error = ESP8266_WifiConnect_OK;
+
     ESP8266->Flags.STA_IP_is_set = 0;
     ESP8266->Flags.STA_netmask_is_set = 0;
     ESP8266->Flags.STA_gateway_is_set = 0;
@@ -1095,6 +1166,8 @@ void Initialize_ESP8266(ESP8266_Str* ESP8266) {
     ESP8266->Flags.last_operation_status = 0;
     ESP8266->Flags.wait_for_wrapper = 0; //wait for "> "
     ESP8266->Flags.wifi_connected = 0;
+    ESP8266->Flags.wifi_got_ip = 0;
+    ESP8266->Flags.DNS_connect_success = 0;
 }
 
 //------------------ Set Mode Wifi *-------------//      
