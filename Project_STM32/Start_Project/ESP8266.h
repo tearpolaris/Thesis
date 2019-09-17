@@ -36,6 +36,7 @@
 #define ESP8266_COMMAND_CIPDOMAIN      15
 #define ESP8266_COMMAND_CIPSTART       16
 #define ESP8266_COMMAND_CIPMUX         17
+#define ESP8266_COMMAND_CIPDINFO       18
 //#define 
 //#define 
 //#define 
@@ -158,7 +159,7 @@ typedef struct Buffer_type {
 } Buffer_t;
 	
 typedef enum ESP8266_Result {ESP8266_OK = 0,
-                             ESP8266_ERROR,
+                             ESP8266_ERROR,  
 	                           ESP8266_BUSY, //In busy
 	                           ESP8266_TIMEOUT, //Command Timeout
 	                           ESP8266_INVALID_PARAMETER,//Invalid parameter
@@ -266,9 +267,13 @@ void Initialize_data_ESP8266(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266, uint32_t baud_rate);
 ESP8266_Result ESP8266_Update(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_WaitReady(ESP8266_Str* ESP8266);
-void Set_Wifi_Mode(Wifi_Mode mode);
+ESP8266_Result ESP8266_Set_Wifi_Mode(Wifi_Mode mode);
 void Connect_To_AP(char* ssid, char* password);
 ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command_str, char* start_respond);
+
+//Function testing for initialization
+ESP8266_Result ESP8266_Remote_IP_Port (ESP8266_Str* ESP8266, uint8_t enable);
+ESP8266_Result ESP8266_Multi_Connection(ESP8266_Str* ESP8266, uint8_t mux);
 
 void Process_SendData(ESP8266_Str* ESP8266);
 void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buffer, uint16_t bufflen);

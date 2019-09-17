@@ -166,7 +166,16 @@ uint32_t Buffer_Write_String(Buffer_t* buffer, char* dat) {
     return Buffer_Write(buffer, strlen(dat), (uint8_t*)dat);
 }
 
-/***************** Read String Buffer *************/
+
+//***********************************************************************//
+//*******  Function: Read String Buffer                            ******//
+//*******  Para list: 1. buffer read data from                     ******//
+//*******             2. save_buffer to save data                  ******//
+//*******                read from buffer                          ******//
+//*******             3. count to know how many data 8-bit is read ******//                          
+//*******  Return:    0 if end character is not in buffer yet      ******//
+//***********************************************************************//
+
 uint32_t Buffer_Read_String(Buffer_t* buffer, char *save_buff, uint32_t count) { 
 	uint32_t read_reserved, write_reserved, idx;
     uint8_t ch;
@@ -754,7 +763,7 @@ ESP8266_Result ESP8266_Multi_Connection(ESP8266_Str* ESP8266, uint8_t mux) {
     char ch_mux = (char)(mux + '0');
 
     ESP8266_CHECK_IDLE(ESP8266);
-    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPMUX=", strlen("AT+CIPMUX"));
+    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPMUX=", strlen("AT+CIPMUX="));
     Transmit_UART(ESP8266_USART, (uint8_t*)&ch_mux, 1);   
     Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
   
@@ -766,6 +775,27 @@ ESP8266_Result ESP8266_Multi_Connection(ESP8266_Str* ESP8266, uint8_t mux) {
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
     }
      ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
+}
+
+//====================================================================//
+//=============== Function Show Remort IP and Port  ==================//
+//====================================================================//
+ESP8266_Result ESP8266_Remote_IP_Port (ESP8266_Str* ESP8266, uint8_t enable) {
+    char ch_en = (char)(enable + '0');
+    
+    ESP8266_CHECK_IDLE(ESP8266);
+    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPINFO=", strlen("AT+CIPINFO="));
+    Transmit_UART(ESP8266_USART, (uint8_t*)&ch_en, 1);
+    Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
+
+    if (Send_Command(ESP8266, ESP8266_COMMAND_CIPDINFO, NULL, NULL) != ESP8266_OK) {
+        return ESP8266->last_result;
+    }
+    ESP8266_WaitReady(ESP8266);
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+    ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
 }
 
 
@@ -804,6 +834,12 @@ ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266, uint32_t baud_rate) {
     if (!ESP8266->Flags.last_operation_status) {
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_DEVICE_NOT_CONNECTED);
     }   
+    while (ESP8266_Multi_Connection(ESP8266, 1) != ESP8266_OK);
+
+    while (ESP8266_Remote_IP_Port(ESP8266, 1) != ESP8266_OK);
+
+    while (ESP8266_Set_Wifi_Mode(AP_STATION_MODE) != ESP8266_OK);
+    
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
    
 }
@@ -1170,18 +1206,39 @@ void Initialize_data_ESP8266(ESP8266_Str* ESP8266) {
     ESP8266->Flags.DNS_connect_success = 0;
 }
 
-//------------------ Set Mode Wifi *-------------//      
-//-----------------------------------------------//
-void Set_Wifi_Mode(Wifi_Mode mode) {
+//==============================================================//
+//====================   Set Mode Wifi     =====================//      
+//==============================================================//
+ESP8266_Result ESP8266_Set_Wifi_Mode(Wifi_Mode mode) {
 	  assert_param(IS_WIFI_MODE(mode));
-	  char sbuf[20];
-	  sprintf(sbuf, "AT+CWMODE_CUR=%d", mode);
-    Transmit_UART(USART1, (uint8_t*)sbuf, strlen(sbuf));
+	  char ch_mode = (char)(mode + '0');
+
+    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CWMODE_CUR=", strlen("AT+CWMODE_CUR="));
+    Transmit_UART(ESP8266_USART, (uint8_t*)&ch_mode, 1);
+    Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
+
+    if (Send_Command(ESP8266, ESP8266_COMMAND_CWMODE, NULL, NULL) != ESP8266_OK) {
+        return ESP8266->last_result;
+    }
+
+    ESP8266_WaitReady(ESP8266);
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+ 
+    ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
+
+//==============================================================//
+//================   Set MAC Station ESP8266  ==================//      
+//==============================================================//
+ESP8266_Result ESP8266_Get_Station_MAC(ESP8266_Str* ESP8266) {
+}
+
 
 //*****************************************************//
 //*************** Connect to Access Point *************//
-//******************************************************
+//****************************************************]**
 
  ESP8266_Wifi_connect_error_t Connect_To_AP(char* ssid, char* password, Wifi_Mode mode,  ESP8266_Str* ESP8266) {
 	  char sbuf[30];
