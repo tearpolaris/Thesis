@@ -1,6 +1,8 @@
 #include "ESP8266.h"
 #include "LCD.h"
 
+#define __DEBUG__
+
 #define CHAR_TO_NUM(x)  ((x) - '0')
 #define CHAR_IS_NUM(x)   ((x) >= '0') && ((x) <= '9')
 #define ESP8266_CHECK_IDLE(ESP8266)                           \
@@ -21,7 +23,9 @@ static Buffer_t USART_buffer;
 static uint8_t USART_data[USART_ESP8266_SIZE];
 static uint32_t ESP8266_baud_rate[] = {9600,  57600, 115200, 921600};
 
-
+#ifdef __DEBUG__
+    uint8_t debug = 0;
+#endif
 /******************************** BUFFER FUNCTION **************************
 1. This is circular buffer, have a fixed-number size
 2. Have two pointer, head and tail (in code is write_idx - head pointer
@@ -30,15 +34,12 @@ and read_idx - tail pointer.
 4. When a byte is read, read_idx will increase. */
 
 
-//**********************************************************//
-//*************** Count number of bytes free ***************//
-//***** Ham nay tra ve so byte con trong de co the ghi duoc //
-//***** Nguoc lai vs ham dem so byte con trong de doc  *****//
-//*********************************************************//
-
+//==========================================================//
+//========= Return number of free bytes to write ===========//
+//==========================================================//
 uint32_t Buffer_Write_Free(Buffer_t* buff) {
 	  uint32_t in, out, num_byte_free;
-	
+
 	  in = buff->write_idx;
 	  out = buff->read_idx;
 	
@@ -59,7 +60,9 @@ uint32_t Buffer_Write_Free(Buffer_t* buff) {
      return (num_byte_free - 1);//Reserved 1 byte to write		
 }
 
-//*********** Count number of bytes free *********//
+//==========================================================//
+//========== Return number of free bytes to read ===========//
+//==========================================================//
 uint32_t Buffer_Read_Free(Buffer_t* buff) {
 	  uint32_t in, out, num_byte_free;
 	
@@ -83,7 +86,9 @@ uint32_t Buffer_Read_Free(Buffer_t* buff) {
     return num_byte_free;		
 }
 
-/********************* Write data to buffer *********************/
+//==========================================================//
+//=================  Write data to buffer  =================//
+//==========================================================//
 uint32_t Buffer_Write(Buffer_t* buff, uint32_t count, uint8_t* dat) {
 	  uint32_t max_allow_write, free, num_write;
 	
@@ -92,31 +97,52 @@ uint32_t Buffer_Write(Buffer_t* buff, uint32_t count, uint8_t* dat) {
 		}
     max_allow_write = count;
     free = Buffer_Write_Free(buff);
-	num_write = 0;
-	
-	if (buff->write_idx >= buff->size) {
-		buff->write_idx = 0;
-	}
-	if (!free) {
-		return 0;//No empty exit
-	}
+    num_write = 0;
+
+    if (buff->write_idx >= buff->size) {
+        buff->write_idx = 0;
+    }
+    if (!free) {
+        return 0;//No empty exit
+    }
     if (free < count) {
         max_allow_write = free;
     }
-		
+		//if (max_allow_write == 1) {
+        //GPIO_SetBits(GPIOD, GPIO_Pin_14);
+    //}
+
     while (max_allow_write--) {
-		buff->Data[buff->write_idx++] = *dat;
-	    dat++;
-			
-		if (buff->write_idx > buff-> size) {
-			buff->write_idx = 0;
-		}
-		num_write++;
-	}
-	return num_write;
+		    buff->Data[buff->write_idx++] = *dat;
+#ifdef __DEBUG__
+        if (debug == 4) {
+            GPIOD->ODR = (uint16_t)*dat;
+            //debug = 2;
+        }
+#endif
+        dat++;
+
+        if (*dat == 'O') {
+            //GPIO_SetBits(GPIOD, GPIO_Pin_14);
+        }
+        
+		    if (buff->write_idx > buff-> size) {
+            buff->write_idx = 0;
+        }
+        num_write++;
+       
+    }
+
+#ifdef __DEBUG__
+    debug++;
+#endif
+
+    return num_write;
 }
 
-/********************* Read data from buffer *********************/
+//=======================================================================//
+//======================  Read data from buffer  ========================//
+//=======================================================================//
 uint32_t Buffer_Read(Buffer_t* buff, uint32_t count, uint8_t* ret_buff) {
 	uint32_t max_allow_read, free, num_read;
 	
@@ -177,23 +203,22 @@ uint32_t Buffer_Write_String(Buffer_t* buffer, char* dat) {
 //***********************************************************************//
 
 uint32_t Buffer_Read_String(Buffer_t* buffer, char *save_buff, uint32_t count) { 
-	uint32_t read_reserved, write_reserved, idx;
+    uint32_t read_reserved, write_reserved, idx;
     uint8_t ch;
 
     if (buffer == NULL) {
 	  return 0;
     }
-		
-	read_reserved = Buffer_Read_Free(buffer);
-	write_reserved = Buffer_Write_Free(buffer);
+
+    read_reserved = Buffer_Read_Free(buffer);
+    write_reserved = Buffer_Write_Free(buffer);
     idx = 0;
-		
-	if ((!read_reserved) ||  
-		((read_reserved < count) 
+
+    if ((!read_reserved) || ((read_reserved < count) 
 		 && (write_reserved > 0) 
 		 && (Buffer_Find_Element(buffer, buffer->End_String) < 0))) { //Data left remain on USART
-		    return 0;
-	}
+        return 0;
+    }
     
     while (idx < count) {
         Buffer_Read(buffer, 1, &ch); 
@@ -309,43 +334,50 @@ int32_t Buffer_Find(Buffer_t* buffer, char* string_find, uint32_t num_find) {
 //******************** FUNCTION FOR INTERRUPT, INITIALIZE UART **************//
 //***************************************************************************//
 void Init_ESP_GPIO(void) {
-	 //Enable Clock for PORT B
-	GPIO_InitTypeDef GPIO_UART_ESP;
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
-  //Enable System  Config Controller Clock
-	GPIO_UART_ESP.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
-  GPIO_UART_ESP.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_UART_ESP.GPIO_OType = GPIO_OType_PP;
-	GPIO_UART_ESP.GPIO_PuPd  = GPIO_PuPd_UP;
-	GPIO_UART_ESP.GPIO_Mode  = GPIO_Mode_AF; 
-	GPIO_Init(GPIOB, &GPIO_UART_ESP);
-	GPIO_PinAFConfig(GPIOB, GPIO_PinSource6, GPIO_AF_USART1);
-	GPIO_PinAFConfig(GPIOB, GPIO_PinSource7, GPIO_AF_USART1);
+    //Enable Clock for PORT B
+    GPIO_InitTypeDef GPIO_UART_ESP;
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+    //Enable System  Config Controller Clock
+    GPIO_UART_ESP.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
+    GPIO_UART_ESP.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_UART_ESP.GPIO_OType = GPIO_OType_PP;
+    GPIO_UART_ESP.GPIO_PuPd  = GPIO_PuPd_UP;
+    GPIO_UART_ESP.GPIO_Mode  = GPIO_Mode_AF; 
+    GPIO_Init(GPIOB, &GPIO_UART_ESP);
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource6, GPIO_AF_USART1);
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource7, GPIO_AF_USART1);
 }
 
+//==================================================================//
+//============= Initialize Vector Interrupt for USART1 =============//
+//==================================================================//
 void Init_USART1_RXNE_Interrupt(USART_TypeDef* USARTx) {
-	NVIC_InitTypeDef NVIC_Init_Struct;
+    NVIC_InitTypeDef NVIC_Init_Struct;
     NVIC_Init_Struct.NVIC_IRQChannel                   = USART1_IRQn;
-	NVIC_Init_Struct.NVIC_IRQChannelPreemptionPriority = 0x00;
-	NVIC_Init_Struct.NVIC_IRQChannelSubPriority        = 0x1;
-	NVIC_Init_Struct.NVIC_IRQChannelCmd                = ENABLE;
+    NVIC_Init_Struct.NVIC_IRQChannelPreemptionPriority = 0x00;
+    NVIC_Init_Struct.NVIC_IRQChannelSubPriority        = 0x1;
+    NVIC_Init_Struct.NVIC_IRQChannelCmd                = ENABLE;
 
-	NVIC_Init(&NVIC_Init_Struct);
+    NVIC_Init(&NVIC_Init_Struct);
 }
 
+//==========================================================================//
+//====== Handle for interrupt USART1 - write data = 1 char to buffer =======//
+//==========================================================================//
 void USART1_IRQHandler(void) {
-    if (USART_GetITStatus(USART1, USART_IT_RXNE)) {
-	    while (!USART_GetFlagStatus(USART1, USART_FLAG_RXNE)) {
+    if (USART_GetITStatus(ESP8266_USART, USART_IT_RXNE)) {
+	    while (!USART_GetFlagStatus(ESP8266_USART, USART_FLAG_RXNE)) {
 	    }
-        uint8_t dat = (uint8_t)USART_ReceiveData(USART1);
-        GPIO_SetBits(GPIOD, GPIO_Pin_13);
-        GPIOD->ODR = (uint16_t)dat;
-        //Buffer_Write(&USART_buffer, 1, &dat);
+        uint8_t dat = (uint8_t)USART_ReceiveData(ESP8266_USART);
+        Buffer_Write(&USART_buffer, 1, &dat);
         //Clear interrupt flag
-        USART_ClearITPendingBit(USART1, USART_IT_RXNE);
+        USART_ClearITPendingBit(ESP8266_USART, USART_IT_RXNE);
     }
 }
 
+//=================================================================//
+//====== Configuration baud rate and enable clockfor USART1 =======//
+//=================================================================//
 void Init_UART_Config(uint32_t baud_rate) {
 	RCC_APB2PeriphClockCmd (RCC_APB2Periph_USART1, ENABLE);
 	USART_InitTypeDef Init_UART_Str;
@@ -357,6 +389,9 @@ void Init_UART_Config(uint32_t baud_rate) {
 	USART_Cmd(USART1, ENABLE);
 }
 
+//=================================================================//
+//================== Transmit data using USARTx ===================//
+//=================================================================//
 void Transmit_UART(USART_TypeDef* USARTx, uint8_t* dat, uint16_t count) {
 	while (count) {
 	  while (!USART_GetFlagStatus(USARTx, USART_FLAG_TXE)) {
@@ -369,39 +404,79 @@ void Transmit_UART(USART_TypeDef* USARTx, uint8_t* dat, uint16_t count) {
 	}
 }
 
+//=================================================================//
+//============= Transmit one character using USARTx ===============//
+//=================================================================//
 char UART_GetChar (USART_TypeDef* USARTx) {
 	while (!USART_GetFlagStatus(USARTx, USART_FLAG_RXNE)) {
 	}
 	return (char)USART_ReceiveData(USARTx);
 }
 
-//Counter 
+//=================================================================//
+//============= Initialize counter to count timeout ===============//
+//=================================================================// 
 void Init_Counter_ESP8266(TIM_TypeDef* TIMx) {
-    TIM_Base_Init->TIM_Period = 0x27; //1200
-    TIM_Base_Init->TIM_Prescaler = 0x0;
-    TIM_Base_Init->TIM_ClockDivision = TIM_CKD_DIV1;
-    TIM_Base_Init->TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_Base_Init->TIM_RepetitionCounter = 0x0; 
-    TIM_TimeBaseInit(TIMx, TIM_Base_Init);
+    TIM_TimeBaseInitTypeDef TIM_Base_Init_ESP8266;
+    uint32_t multipler, TIM3_Clk_Frequency, TIM3_Counter_Frequency;
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+    RCC_ClocksTypeDef RCC_Clocks;
+    RCC_GetClocksFreq(&RCC_Clocks);
+    if (RCC_Clocks.PCLK1_Frequency == RCC_Clocks.SYSCLK_Frequency) {
+        multipler = 1;
+    }  
+    else {
+        multipler = 2;
+    }
+    TIM3_Clk_Frequency = multipler * RCC_Clocks.PCLK1_Frequency;
+    TIM3_Counter_Frequency = 1000;//Frequency is 1 kHz
+      
+    //TIM_InternalClockConfig(TIMx);
+    //TIM_Base_Init_ESP8266->TIM_Period = 0x27; //1200
+    TIM_Base_Init_ESP8266.TIM_Period = 0x3E7; //1000
+    TIM_Base_Init_ESP8266.TIM_Prescaler = (TIM3_Clk_Frequency/TIM3_Counter_Frequency) - 1; //15999
+    //TIM_Base_Init_ESP8266.TIM_Prescaler = 15999;
+    TIM_Base_Init_ESP8266.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_Base_Init_ESP8266.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_Base_Init_ESP8266.TIM_RepetitionCounter = 0x0; 
+    TIM_TimeBaseInit(TIMx, &TIM_Base_Init_ESP8266);
     TIM_ITConfig(TIMx, TIM_IT_Update, ENABLE);
-    TIM_Cmd(TIM2, ENABLE);
+    TIM_Cmd(TIMx, ENABLE);
     Init_Interrupt_TIM3();
 }
 
+//=================================================================//
+//================= Initialize interrupt counter ==================//
+//=================================================================// 
 void Init_Interrupt_TIM3(void) {
     NVIC_InitTypeDef NVIC_Init_TIM_Struct;
     NVIC_Init_TIM_Struct.NVIC_IRQChannel = TIM3_IRQn;
-    NVIC_Init_TIM_Struct.NVIC_IRQChannelPreemptionPriority = 0x1;
-    NVIC_Init_TIM_Struct.NVIC_IRQChannelSubPriority = 0x2;
+    NVIC_Init_TIM_Struct.NVIC_IRQChannelPreemptionPriority = 0x2;
+    NVIC_Init_TIM_Struct.NVIC_IRQChannelSubPriority = 0x3;
     NVIC_Init_TIM_Struct.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_Init_TIM_Struct);
 }
 
-void TIM3_IRQHanlder(void) {
-    if (start_track) {
-        track_time_out++;
+//===================================================//
+//========== Initialize interrupt counter ===========//
+//===================================================//
+void TIM3_IRQHandler(void) {
+    if (TIM_GetITStatus(TIM3, TIM_IT_Update)) {
+        //GPIO_ToggleBits(GPIOD, GPIO_Pin_13);
+        if (start_track) {
+            track_time_out++;
+        }
+        TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
     }
 }
+
+//===================================================//
+//========== Initialize interrupt counter ===========//
+//===================================================//
+void TIMx_Reset_CNT(TIM_TypeDef* TIMx) {
+    TIMx->CNT = 0x0;
+}
+
 
 /************************ FUNCTION FOR ESP8266 *******************/
 //---------------------- FUNCTION ANALYZE STRING -------------------//
@@ -647,15 +722,20 @@ void ParseCWLAP(ESP8266_Str* ESP8266, char* received) {
     ESP8266_Multi_AP.AP_valid++;
 }
 
+//**************************************************************************//
+//************ Function: Parse received data command AT+CIPSTA *************//
+//************ Variable type: 1 mean IP, 2 means gateway       *************//
+//************                3 means netmask                  *************//
+//**************************************************************************//
 void ParseCIPSTA(ESP8266_Str* ESP8266, char* received) {
     uint8_t pos, type, command;
 
-    if (strncmp(received, "+CIPSTA_CUR:ip", 14)) {
+    if (strncmp(received, "+CIPSTA_CUR:ip", strlen("+CIPSTA_CUR:ip"))) {
         pos = 14;
         type = 1;
         command = ESP8266_COMMAND_CIPSTA;
     }
-    else if (strncmp(received, "+CIPSTA_CUR:gateway", 19)) {
+    else if (strncmp(received, "+CIPSTA_CUR:gateway", strlen("+CIPSTA_CUR:gateway"))) {
         pos = 19;
         type = 2;
         command = ESP8266_COMMAND_CIPSTA;
@@ -806,40 +886,60 @@ ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266, uint32_t baud_rate) {
     if(Buffer_Init(&USART_buffer, USART_ESP8266_SIZE, USART_data)) {
         return ESP8266_MALLOC_ERR;
     }
-    Initialize_data_ESP8266(ESP8266);
+
+    //Initialize GPIO Pin 
+    Init_ESP_GPIO();
+
+    //Initialize baud rate and timeout 
     Init_UART_Config(baud_rate);
-    ESP8266->timeout = 1000;
+ 
+    //Init USART Interrupt
+    Init_USART1_RXNE_Interrupt(ESP8266_USART);
+
+    //Init Counter to count timeout
+    Init_Counter_ESP8266(TIM3);
+
+    //Initialize data
+    Initialize_data_ESP8266(ESP8266);
+
+    ESP8266->timeout = 1;
     Send_Command(ESP8266, ESP8266_COMMAND_RST, "AT+RST\r\n", "ready\r\n");
     ESP8266_WaitReady(ESP8266);
-    if (!ESP8266->Flags.last_operation_status) {
-        for (int i=0; i < sizeof(ESP8266_baud_rate)/sizeof(ESP8266_baud_rate[0]); i++) {
-            Init_UART_Config(ESP8266_baud_rate[i]);
-            ESP8266->timeout = 1000;
-            Send_Command(ESP8266, ESP8266_COMMAND_RST, "AT+RST\r\n", "ready\r\n");
-            ESP8266_WaitReady(ESP8266);
-            if (ESP8266->Flags.last_operation_status) {
-                ESP8266->baud_rate = ESP8266_baud_rate[i];
-                break;
-            }
-        }
-    }
-
-    if (!ESP8266->Flags.last_operation_status) {
-        ESP8266_RETURN_STATUS(ESP8266, ESP8266_DEVICE_NOT_CONNECTED);
-    }
-  
-    ESP8266->timeout = 30000;
-    Send_Command(ESP8266, ESP8266_COMMAND_AT, "AT\r\n", "OK\r\n");
-    ESP8266_WaitReady(ESP8266);
+    //if (!ESP8266->Flags.last_operation_status) {
+    //    for (int i=0; i < sizeof(ESP8266_baud_rate)/sizeof(ESP8266_baud_rate[0]); i++) {
+    //        Init_UART_Config(ESP8266_baud_rate[i]);
+    //        ESP8266->timeout = 1000;
+    //        Send_Command(ESP8266, ESP8266_COMMAND_RST, "AT+RST\r\n", "ready\r\n");
+    //        ESP8266_WaitReady(ESP8266);
+    //        if (ESP8266->Flags.last_operation_status) {
+    //            ESP8266->baud_rate = ESP8266_baud_rate[i];
+    //            break;
+    //        }
+    //    }
+    //}
+    //
     if (!ESP8266->Flags.last_operation_status) {
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_DEVICE_NOT_CONNECTED);
-    }   
-    while (ESP8266_Multi_Connection(ESP8266, 1) != ESP8266_OK);
-
-    while (ESP8266_Remote_IP_Port(ESP8266, 1) != ESP8266_OK);
-
-    while (ESP8266_Set_Wifi_Mode(AP_STATION_MODE) != ESP8266_OK);
-    
+    }
+    //
+    //ESP8266->timeout = 30000;
+    //Send_Command(ESP8266, ESP8266_COMMAND_AT, "AT\r\n", "OK\r\n");
+    //ESP8266_WaitReady(ESP8266);
+    //if (!ESP8266->Flags.last_operation_status) {
+    //    ESP8266_RETURN_STATUS(ESP8266, ESP8266_DEVICE_NOT_CONNECTED);
+    //}   
+    //while (ESP8266_Multi_Connection(ESP8266, 1) != ESP8266_OK);
+    //
+    //while (ESP8266_Remote_IP_Port(ESP8266, 1) != ESP8266_OK);
+    //
+    //while (ESP8266_Set_Wifi_Mode(ESP8266, AP_STATION_MODE) != ESP8266_OK);
+    //
+    //while (ESP8266_Get_Station_MAC(ESP8266) != ESP8266_OK);
+    //
+    //while (ESP8266_Get_AP_MAC(ESP8266) != ESP8266_OK);
+    //
+    //while (ESP8266_Get_AP_IP(ESP8266) != ESP8266_OK);
+    //GPIOD->ODR = USART_data[0];
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
    
 }
@@ -855,6 +955,8 @@ ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command
     }
     ESP8266->current_command = command;
     start_track = 1;//Start count time
+    track_time_out = 0;
+    TIMx_Reset_CNT(TIM3);//Staring timer from 0
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);  
 }
 
@@ -916,6 +1018,16 @@ ESP8266_Result ESP8266_Update(ESP8266_Str* ESP8266) {
     
     count = sizeof(char_received)/sizeof(char);
     string_length = Buffer_Read_String(&USART_buffer, char_received, sizeof(char_received)/sizeof(char));
+
+    //############# DEBUG ##########
+    if (!string_length) {
+        //GPIO_SetBits(GPIOD, GPIO_Pin_14);
+    }
+    else {
+        //GPIO_SetBits(GPIOD, GPIO_Pin_15);
+    }
+    //##############################
+
     while (string_length > 0) {
         ParseReceived(ESP8266, char_received, 1, string_length);
         string_length = Buffer_Read_String(&USART_buffer, char_received, sizeof(char_received)/sizeof(char));
@@ -1110,7 +1222,8 @@ void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buff
     }
 
     ESP8266->last_received_time = ESP8266->time;
-    if (strcmp(received, "OK\r\n")) {
+    if (!strcmp(received, "OK\r\n") || !strcmp(received, "ready\r\n")) {
+        //GPIO_SetBits(GPIOD, GPIO_Pin_14);
         ESP8266->Flags.last_operation_status = 1;
     }
     if ((!strcmp(received, "ERROR\r\n")) || strcmp(received, "busy p...\r\n")) {
@@ -1122,13 +1235,14 @@ void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buff
         ESP8266->current_command = ESP8266_COMMAND_IDLE;
         ESP8266->Flags.wait_for_wrapper = 0;
     }
+    //GPIO_SetBits(GPIOD, GPIO_Pin_14);
 }
 
 //**************************** CALL USER FUNCTION *******************************//
 void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266) {
     ESP8266->Wifi_connect_error =  ESP8266_WifiConnect_OK;
     printf("Connect Wifi succefully!\n");
-    printf("SSID: %s\n", ESP8266->
+    printf("SSID: %s\n", ESP8266->connected_Wifi.SSID);
 }
 void ESP8266_CallBack_DNS_Fail (ESP8266_Str* ESP8266) {
     ESP8266->Wifi_connect_error = ESP8266_DNS_Connect_Fail;
@@ -1144,10 +1258,13 @@ void ESP8266_CallBack_TCP_Connection_Fail(ESP8266_Str* ESP8266) {
 //------------------ Initialize ESP8266 ------------//
 //---------- Reset all variables to 0 --------------//
 void Initialize_data_ESP8266(ESP8266_Str* ESP8266) {
+    if (ESP8266 == NULL) {
+        ESP8266 = (ESP8266_Str*)malloc(1*sizeof(ESP8266_Str));
+    }
     ESP8266->time = 0;
 	  ESP8266->start_time = 0;
     ESP8266->timeout = 0;
-	  ESP8266->current_command = 0;
+	  ESP8266->current_command = ESP8266_COMMAND_IDLE;
     ESP8266->last_received_time = 0;
     ESP8266->total_byte_received = 0;
     ESP8266->total_byte_sent = 0;
@@ -1190,7 +1307,7 @@ void Initialize_data_ESP8266(ESP8266_Str* ESP8266) {
 
     
     ESP8266->send_data_connection = (ESP8266_Connection_t*)malloc(1*sizeof(ESP8266_Connection_t));
-    ESP8266->last_result = 0;
+    ESP8266->last_result = ESP8266_OK;
     ESP8266->Wifi_connect_error = ESP8266_WifiConnect_OK;
 
     ESP8266->Flags.STA_IP_is_set = 0;
@@ -1209,7 +1326,7 @@ void Initialize_data_ESP8266(ESP8266_Str* ESP8266) {
 //==============================================================//
 //====================   Set Mode Wifi     =====================//      
 //==============================================================//
-ESP8266_Result ESP8266_Set_Wifi_Mode(Wifi_Mode mode) {
+ESP8266_Result ESP8266_Set_Wifi_Mode(ESP8266_Str* ESP8266, Wifi_Mode mode) {
 	  assert_param(IS_WIFI_MODE(mode));
 	  char ch_mode = (char)(mode + '0');
 
@@ -1230,17 +1347,40 @@ ESP8266_Result ESP8266_Set_Wifi_Mode(Wifi_Mode mode) {
 }
 
 //==============================================================//
-//================   Set MAC Station ESP8266  ==================//      
+//================   Get MAC Station ESP8266  ==================//      
 //==============================================================//
 ESP8266_Result ESP8266_Get_Station_MAC(ESP8266_Str* ESP8266) {
+    Send_Command(ESP8266, ESP8266_COMMAND_CIPSTAMAC, "AT+CIPSTAMAC_CUR?\r\n", "+CIPSTAMAC_CUR");
+    if (ESP8266->last_result == ESP8266_OK) {
+        ESP8266->Flags.STA_MAC_is_set = 0;
+    }
+    return ESP8266->last_result;
 }
 
+//==============================================================//
+//==============  Get MAC Access Point ESP8266    ==============//      
+//==============================================================//
+ESP8266_Result ESP8266_Get_AP_MAC(ESP8266_Str* ESP8266) {
+    Send_Command(ESP8266, ESP8266_COMMAND_CIPAPMAC, "AT+CIPAPMAC_CUR?\r\n", "+CIPAPMAC_CUR");
+    if (ESP8266->last_result == ESP8266_OK) {
+        ESP8266->Flags.AP_MAC_is_set = 0;
+    }
+    return ESP8266->last_result;
+}
 
-//*****************************************************//
-//*************** Connect to Access Point *************//
-//****************************************************]**
-
- ESP8266_Wifi_connect_error_t Connect_To_AP(char* ssid, char* password, Wifi_Mode mode,  ESP8266_Str* ESP8266) {
+//==============================================================//
+//==============   Get IP Access Point ESP8266    ==============//      
+//==============================================================//
+ESP8266_Result ESP8266_Get_AP_IP(ESP8266_Str* ESP8266) {
+    Send_Command(ESP8266, ESP8266_COMMAND_CIPAPMAC, "AT+CIPAP_CUR?\r\n", "+CIPAP_CUR");
+    if (ESP8266->last_result == ESP8266_OK) {
+        ESP8266->Flags.AP_IP_is_set = 0;
+        ESP8266->Flags.AP_netmask_is_set = 0;
+        ESP8266->Flags.AP_gateway_is_set = 0;
+    }
+    return ESP8266->last_result;
+}
+ /*ESP8266_Wifi_connect_error_t Connect_To_AP(char* ssid, char* password, Wifi_Mode mode,  ESP8266_Str* ESP8266) {
 	  char sbuf[30];
     unsigned char access_mode;
     //Check ESP8266 is access point or station
@@ -1262,9 +1402,11 @@ ESP8266_Result ESP8266_Get_Station_MAC(ESP8266_Str* ESP8266) {
     Transmit_UART(USART1, (uint8_t*)sbuf, strlen(sbuf));
     return ESP8266_WifiConnect_OK;
 }
+*/
 
 /******************************************************/
 
+/* 
 ESP8266_Wifi_connect_error_t Establish_TCP(char* domain_name, ESP8266_Str* ESP8266) {
     char sbuf[40], i;
 
@@ -1308,6 +1450,7 @@ ESP8266_Wifi_connect_error_t Establish_TCP(char* domain_name, ESP8266_Str* ESP82
         
     return ESP8266->Wifi_connect_error;
 }
+*/
 
 ESP8266_Wifi_connect_error_t Set_Data_Length(ESP8266_Str* ESP8266, int length) {
     char sbuf[30];
@@ -1337,12 +1480,12 @@ ESP8266_Wifi_connect_error_t Set_Data_Length(ESP8266_Str* ESP8266, int length) {
 ESP8266_Wifi_connect_error_t Send_data_TCP(ESP8266_Str* ESP8266, char* data, int length) {
     if (Set_Data_Length(ESP8266, length) != ESP8266_WifiConnect_OK) {
         printf("Error when set data length\n");
-        return ESP8266->Wifi_connect_error;
-     }
+    }
+    return ESP8266->Wifi_connect_error;
 //Send data to Web Browser for display, or GET HTTP 1.1
 }
 
 
 
-void Web_Content_To_Browser(void) {
-}
+//void Web_Content_To_Browser(void) {
+//}

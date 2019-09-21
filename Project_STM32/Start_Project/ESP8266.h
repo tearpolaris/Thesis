@@ -1,7 +1,9 @@
 //OVER8 = 0 => Oversampling by 16, giam sai so do lech clock
 //ONEBIT = 0 => Lay mau 3 lan tai trung tam cua bit
-#include <stm32f4xx_usart.h>
+#include <stm32f4xx.h>
+//#include <stm32f4xx_usart.h>
 #include <stm32f4xx_tim.h> 
+#include <stm32f4xx_rcc.h>
 #include <stdlib.h>
 
 #define BUFFER_INITIALIZED 0x1
@@ -46,8 +48,6 @@
 //#define 
 //#define 
 //#define 
-
-TIM_TimeBaseInitTypeDef* TIM_Base_Init;
 
 typedef enum {
     ESP8266_ECN_OPEN = 0x0,
@@ -200,9 +200,11 @@ typedef struct ESP8266_Str{
         uint8_t STA_IP_is_set:1;
         uint8_t STA_netmask_is_set:1;
         uint8_t STA_gateway_is_set:1;
+        uint8_t STA_MAC_is_set:1; //MAC address Station Mode set
         uint8_t AP_IP_is_set:1;
         uint8_t AP_netmask_is_set:1;
         uint8_t AP_gateway_is_set:1;
+        uint8_t AP_MAC_is_set:1; //MAC address Access Point Mode set
         uint8_t last_operation_status:1;
         uint8_t wait_for_wrapper:1; //wait for "> "
         uint8_t wifi_connected: 1;
@@ -267,13 +269,18 @@ void Initialize_data_ESP8266(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266, uint32_t baud_rate);
 ESP8266_Result ESP8266_Update(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_WaitReady(ESP8266_Str* ESP8266);
-ESP8266_Result ESP8266_Set_Wifi_Mode(Wifi_Mode mode);
+ESP8266_Result ESP8266_Set_Wifi_Mode(ESP8266_Str* ESP8266, Wifi_Mode mode);
+ESP8266_Result ESP8266_Get_AP_IP(ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_Get_AP_MAC(ESP8266_Str* ESP8266);
 void Connect_To_AP(char* ssid, char* password);
 ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command_str, char* start_respond);
 
 //Function testing for initialization
 ESP8266_Result ESP8266_Remote_IP_Port (ESP8266_Str* ESP8266, uint8_t enable);
 ESP8266_Result ESP8266_Multi_Connection(ESP8266_Str* ESP8266, uint8_t mux);
+ESP8266_Result ESP8266_Get_Station_MAC(ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_Get_AP_MAC(ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_Get_AP_IP(ESP8266_Str* ESP8266);
 
 void Process_SendData(ESP8266_Str* ESP8266);
 void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buffer, uint16_t bufflen);
