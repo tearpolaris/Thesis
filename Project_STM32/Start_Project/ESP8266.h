@@ -1,3 +1,5 @@
+#ifndef __ESP8266_H__
+#define __ESP8266_H__
 //OVER8 = 0 => Oversampling by 16, giam sai so do lech clock
 //ONEBIT = 0 => Lay mau 3 lan tai trung tam cua bit
 #include <stm32f4xx.h>
@@ -153,6 +155,7 @@ typedef struct Buffer_type {
   uint32_t size; //
 	uint32_t write_idx; //position of write
 	uint32_t read_idx;  //position of read, buffer is read will be free
+  uint32_t num;
 	uint8_t* Data;      //buffer to save data, read from USART
 	uint8_t Flags;      
 	uint8_t End_String; //Character end of string
@@ -167,10 +170,26 @@ typedef enum ESP8266_Result {ESP8266_OK = 0,
                              ESP8266_MALLOC_ERR
 } ESP8266_Result;
 
+typedef struct ESP8266_Flag{
+    uint8_t STA_IP_is_set;
+    uint8_t STA_netmask_is_set;
+    uint8_t STA_gateway_is_set;
+    uint8_t STA_MAC_is_set;
+    uint8_t AP_IP_is_set;
+    uint8_t AP_netmask_is_set;
+    uint8_t AP_gateway_is_set;
+    uint8_t AP_MAC_is_set;
+    uint8_t last_operation_status;
+    uint8_t wait_for_wrapper;
+    uint8_t wifi_connected;
+    uint8_t wifi_got_ip;
+    uint8_t DNS_connect_success;
+}ESP8266_Flag;
+
 typedef struct ESP8266_Str{
     uint32_t time;
 	  uint32_t start_time;
-    uint32_t timeout;
+    uint8_t timeout;
 	  uint32_t current_command;
     uint32_t last_received_time;
     uint32_t total_byte_received;
@@ -196,21 +215,7 @@ typedef struct ESP8266_Str{
     ESP8266_Connected_Multi_Station_t connected_stations;
     ESP8266_Connection_t connection[ESP8266_MAX_CONNECTIONS];
     ESP8266_Connection_t* send_data_connection;
-    union {
-        uint8_t STA_IP_is_set:1;
-        uint8_t STA_netmask_is_set:1;
-        uint8_t STA_gateway_is_set:1;
-        uint8_t STA_MAC_is_set:1; //MAC address Station Mode set
-        uint8_t AP_IP_is_set:1;
-        uint8_t AP_netmask_is_set:1;
-        uint8_t AP_gateway_is_set:1;
-        uint8_t AP_MAC_is_set:1; //MAC address Access Point Mode set
-        uint8_t last_operation_status:1;
-        uint8_t wait_for_wrapper:1; //wait for "> "
-        uint8_t wifi_connected: 1;
-        uint8_t wifi_got_ip:1;
-        uint8_t DNS_connect_success:1;
-    }Flags;
+    ESP8266_Flag Flags;
 } ESP8266_Str;
 	                         
 
@@ -224,6 +229,7 @@ typedef struct ESP8266_Str{
 /*************************************************************/		
 							
 uint32_t Buffer_Write_Free(Buffer_t* buff);
+//uint32_t Buffer_Write_Free(Buffer_t buff);
 uint32_t Buffer_Read_Free(Buffer_t* buff);
 uint32_t Buffer_Write(Buffer_t* buff, uint32_t count, uint8_t* dat);
 uint32_t Buffer_Read(Buffer_t* buff, uint32_t count, uint8_t* ret_buff);												
@@ -248,7 +254,7 @@ void Init_ESP_GPIO(void);
 void Transmit_UART(USART_TypeDef* USARTx, uint8_t* dat, uint16_t count);
 char UART_GetChar (USART_TypeDef* USARTx);
 char* Receive_UART(USART_TypeDef* USARTx, int num_char_receive);
-void  Init_USART1_RXNE_Interrupt(USART_TypeDef* USARTx);
+void  Init_USART1_RXNE_Interrupt(void);
 /**************************************************************************/
 
 /*************************** COUNTER FUNCTION ********************************/		
@@ -297,3 +303,4 @@ uint8_t Char_Is_Hex(char ch);
 uint32_t Cal_Hex_Num(char* ptr, uint8_t* count);
 uint32_t ParseNumber(char* ptr, uint8_t* cnt);
 /***************************************************************************/	
+#endif
