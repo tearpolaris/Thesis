@@ -6,24 +6,21 @@
 #include "LCD.h"
 #include "ESP8266.h"
 
+
 int main(void) {	
-	//char convert_data[8];
-  char *str = "AT\r\n";
-	TIM_TimeBaseInitTypeDef  TIM_TimeBase;
-	//TIM_OCInitTypeDef  TIM_OC;
-	Init_TIM2(TIM_TimeBase);
-	//Init_Output_Compare(TIM_OC);
-	TIM_Cmd(TIM2, ENABLE);
-  Test_Interrupt();
-  Init_USART1_RXNE_Interrupt(USART1);
-	//GPIO_SetBits(GPIOD, GPIO_Pin_13);
-	Init_ESP_GPIO();
-	Init_UART_Config();
-	//USART_SendData (USART1, 0x41);
-  Transmit_UART(USART1, (uint8_t*)str, strlen(str));
-	GPIO_SetBits(GPIOD, GPIO_Pin_12);
-	while(1) {
-	}
+	  //char convert_data[8]
+    //ESP8266_Str* ESP8266 = (ESP8266_Str*)calloc(1, sizeof(ESP8266_Str));
+    ESP8266_Str ESP8266;
+    ESP8266_Result ret;
+    TIM_TimeBaseInitTypeDef  TIM_TimeBase;
+    Init_TIM2(TIM_TimeBase);
+    TIM_Cmd(TIM2, ENABLE);
+    Test_Interrupt();
+    ret = ESP8266_Init(&ESP8266, 115200);
+    if (ret == ESP8266_OK) {
+    } 
+    while(1) {
+    }
 		//return 0;
 }
 

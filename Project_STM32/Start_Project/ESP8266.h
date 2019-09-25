@@ -1,5 +1,5 @@
-#ifndef __ESP8266_H__
-#define __ESP8266_H__
+//#ifndef __ESP8266_H__
+//#define __ESP8266_H__
 //OVER8 = 0 => Oversampling by 16, giam sai so do lech clock
 //ONEBIT = 0 => Lay mau 3 lan tai trung tam cua bit
 #include <stm32f4xx.h>
@@ -13,7 +13,7 @@
 
 #define UART_TRANS_ENABLE 0x08
 #define ESP8266_USART USART1
-#define USART_ESP8266_SIZE 1024
+#define USART_ESP8266_SIZE 800
 #define ESP8266_CONNECTION_BUFFER_SIZE  5096
 
 #define ESP8266_MAX_AP_DETECTED 15
@@ -216,6 +216,19 @@ typedef struct ESP8266_Str{
     ESP8266_Connection_t connection[ESP8266_MAX_CONNECTIONS];
     ESP8266_Connection_t* send_data_connection;
     ESP8266_Flag Flags;
+    //uint8_t STA_IP_is_set;
+    //uint8_t STA_netmask_is_set;
+    //uint8_t STA_gateway_is_set;
+    //uint8_t STA_MAC_is_set;
+    //uint8_t AP_IP_is_set;
+    //uint8_t AP_netmask_is_set;
+    //uint8_t AP_gateway_is_set;
+    //uint8_t AP_MAC_is_set;
+    //uint8_t last_operation_status;
+    //uint8_t wait_for_wrapper;
+    //uint8_t wifi_connected;
+    //uint8_t wifi_got_ip;
+    //uint8_t DNS_connect_success;
 } ESP8266_Str;
 	                         
 
@@ -272,9 +285,9 @@ void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266);
 /**************************** ESP8266 FUNCTION *****************************/
 /***************************************************************************/	
 void Initialize_data_ESP8266(ESP8266_Str* ESP8266);
-ESP8266_Result ESP8266_Init(ESP8266_Str* ESP8266, uint32_t baud_rate);
+ESP8266_Result ESP8266_Init(ESP8266_Str* const ESP8266, uint32_t baud_rate);
 ESP8266_Result ESP8266_Update(ESP8266_Str* ESP8266);
-ESP8266_Result ESP8266_WaitReady(ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_WaitReady(ESP8266_Str* const ESP8266);
 ESP8266_Result ESP8266_Set_Wifi_Mode(ESP8266_Str* ESP8266, Wifi_Mode mode);
 ESP8266_Result ESP8266_Get_AP_IP(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_Get_AP_MAC(ESP8266_Str* ESP8266);
@@ -303,4 +316,4 @@ uint8_t Char_Is_Hex(char ch);
 uint32_t Cal_Hex_Num(char* ptr, uint8_t* count);
 uint32_t ParseNumber(char* ptr, uint8_t* cnt);
 /***************************************************************************/	
-#endif
+//#endif
