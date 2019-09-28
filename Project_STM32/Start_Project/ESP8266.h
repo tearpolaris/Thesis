@@ -204,7 +204,8 @@ typedef struct ESP8266_Str{
     uint8_t AP_gateway[4];
     uint8_t AP_netmask[4];
     uint8_t AP_MAC[4];
-    uint8_t DNS_IP[4];//IP address for a DNS name
+    //uint8_t DNS_IP[4];//IP address for a DNS name
+    char DNS_IP[16];
     ESP8266_Result last_result;
     ESP8266_Wifi_connect_error_t Wifi_connect_error;
     Wifi_Mode send_mode;
@@ -216,19 +217,6 @@ typedef struct ESP8266_Str{
     ESP8266_Connection_t connection[ESP8266_MAX_CONNECTIONS];
     ESP8266_Connection_t* send_data_connection;
     ESP8266_Flag Flags;
-    //uint8_t STA_IP_is_set;
-    //uint8_t STA_netmask_is_set;
-    //uint8_t STA_gateway_is_set;
-    //uint8_t STA_MAC_is_set;
-    //uint8_t AP_IP_is_set;
-    //uint8_t AP_netmask_is_set;
-    //uint8_t AP_gateway_is_set;
-    //uint8_t AP_MAC_is_set;
-    //uint8_t last_operation_status;
-    //uint8_t wait_for_wrapper;
-    //uint8_t wifi_connected;
-    //uint8_t wifi_got_ip;
-    //uint8_t DNS_connect_success;
 } ESP8266_Str;
 	                         
 
@@ -268,6 +256,9 @@ void Transmit_UART(USART_TypeDef* USARTx, uint8_t* dat, uint16_t count);
 char UART_GetChar (USART_TypeDef* USARTx);
 char* Receive_UART(USART_TypeDef* USARTx, int num_char_receive);
 void  Init_USART1_RXNE_Interrupt(void);
+
+void Debug_init_UART_Config(USART_TypeDef* USARTx, uint32_t baud_rate);
+void Init_Debug_GPIO(void);
 /**************************************************************************/
 
 /*************************** COUNTER FUNCTION ********************************/		
@@ -280,6 +271,7 @@ void Init_Interrupt_TIM3(void);
 void ESP8266_CallBack_DNS_Fail (ESP8266_Str* ESP8266);
 void ESP8266_CallBack_TCP_Connection_Fail(ESP8266_Str* ESP8266);
 void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266);
+void ESP8266_Callback_WifiConnectFailed(ESP8266_Str* ESP8266);
 /***************************************************************************/	
 	
 /**************************** ESP8266 FUNCTION *****************************/
@@ -293,6 +285,8 @@ ESP8266_Result ESP8266_Get_AP_IP(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_Get_AP_MAC(ESP8266_Str* ESP8266);
 void Connect_To_AP(char* ssid, char* password);
 ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command_str, char* start_respond);
+
+ESP8266_Result ESP8266_Get_Data_Web(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, char* domain_name);
 
 //Function testing for initialization
 ESP8266_Result ESP8266_Remote_IP_Port (ESP8266_Str* ESP8266, uint8_t enable);
@@ -315,5 +309,7 @@ uint8_t Hex_To_Num(char ch);
 uint8_t Char_Is_Hex(char ch);
 uint32_t Cal_Hex_Num(char* ptr, uint8_t* count);
 uint32_t ParseNumber(char* ptr, uint8_t* cnt);
+
+static void Delay_ESP8266(uint32_t milis);
 /***************************************************************************/	
 //#endif
