@@ -5,7 +5,6 @@
 
 #define CHAR_TO_NUM(x)  ((x) - '0')
 #define CHAR_IS_NUM(x)   ((x) >= '0') && ((x) <= '9')
-
 //===============================
 #define ESP8266_UPDATE_MACRO(ESP8266)                    \
     if(ESP8266->timeout == 0) {                          \
@@ -638,15 +637,15 @@ void ParseIP(char* IP_str, uint8_t* arr, uint8_t* cnt) {
     uint8_t num_char, idx, ct;
 
     num_char = idx = 0;
-    //Transmit_UART(USART6, (uint8_t*)IP_str, strlen(IP_str));
+    Transmit_UART(USART6, (uint8_t*)IP_str, strlen(IP_str));
     memcpy(Data, IP_str, sizeof(Data) -1);
     //Transmit_UART(USART6, (uint8_t*)Data, strlen(Data));
     Data[sizeof(Data)-1] = 0;
     token = strtok(Data, ".");
-	Transmit_UART(USART6, (uint8_t*)"Start Debug\n", strlen("Start Debug\n"));
+	  //Transmit_UART(USART6, (uint8_t*)"Start Debug\n", strlen("Start Debug\n"));
     while (token != NULL) {
-        Transmit_UART(USART6, (uint8_t*)token, strlen(token));
-		Transmit_UART(USART6, (uint8_t*)"\n", 1);
+        //Transmit_UART(USART6, (uint8_t*)token, strlen(token));
+		    //Transmit_UART(USART6, (uint8_t*)"\n", 1);
         arr[idx++] = ParseNumber(token, &ct);
         num_char += ct;
 
@@ -773,31 +772,33 @@ void ParseCWLAP(ESP8266_Str* ESP8266, char* received) {
 //**************************************************************************//
 void ParseCIPSTA(ESP8266_Str* ESP8266, char* received) {
     uint8_t pos, type, command;
-
-    if (strncmp(received, "+CIPSTA_CUR:ip", strlen("+CIPSTA_CUR:ip"))) {
+   
+	//Transmit_UART(USART6, (uint8_t*)received, strlen(received));
+	command = ESP8266_COMMAND_CIPAP;
+    if (!strncmp(received, "+CIPSTA_CUR:ip", strlen("+CIPSTA_CUR:ip"))) {
         pos = 14;
         type = 1;
         command = ESP8266_COMMAND_CIPSTA;
     }
-    else if (strncmp(received, "+CIPSTA_CUR:gateway", strlen("+CIPSTA_CUR:gateway"))) {
+    else if (!strncmp(received, "+CIPSTA_CUR:gateway", strlen("+CIPSTA_CUR:gateway"))) {
         pos = 19;
         type = 2;
         command = ESP8266_COMMAND_CIPSTA;
     }
-    else if (strncmp(received, "+CIPSTA_CUR:netmask", 19)) {
+    else if (!strncmp(received, "+CIPSTA_CUR:netmask", 19)) {
         pos = 19;
         type = 3;
         command = ESP8266_COMMAND_CIPSTA;
     }
-    else if (strncmp(received, "+CIPAP_CUR:ip", 13)) {
-        pos = 9;
+    else if (!strncmp(received, "+CIPAP_CUR:ip", 13)) {
+        pos = 13;
         type = 1;
     }
-    else if (strncmp(received, "+CIPAP_CUR:gateway", 18)) {
+    else if (!strncmp(received, "+CIPAP_CUR:gateway", 18)) {
         pos = 18;
         type = 2;
     }
-    else if (strncmp(received, "+CIPAP_CUR:netmask", 18)) {
+    else if (!strncmp(received, "+CIPAP_CUR:netmask", 18)) {
         pos = 18;
         type = 3;
     }
@@ -806,6 +807,7 @@ void ParseCIPSTA(ESP8266_Str* ESP8266, char* received) {
     }
 
     if (command == ESP8266_COMMAND_CIPSTA) {
+		//GPIO_SetBits(GPIOD, GPIO_Pin_12);
         switch(type) {
             case 1:
                 ParseIP(&received[pos+2], ESP8266->STA_IP, NULL);
@@ -827,7 +829,7 @@ void ParseCIPSTA(ESP8266_Str* ESP8266, char* received) {
         }
     }
     else {
-      switch(type) {
+        switch(type) {
             case 1:
                 ParseIP(&received[pos+2], ESP8266->AP_IP, NULL);
                 ESP8266->Flags.AP_IP_is_set = 1;
@@ -887,59 +889,6 @@ void ParseCWJAP(ESP8266_Str* ESP8266, char* received) {
 }
 
 //******************************************************************//
-//********      Function test ESP8266 initialization      **********//
-//******************************************************************//
-ESP8266_Result ESP8266_Multi_Connection(ESP8266_Str* ESP8266, uint8_t mux) {
-    char ch_mux = (char)(mux + '0');
-   uint32_t string_length, count;
-    int16_t found_wrapper;
-    char char_received[128];
-    char dummy[2];
-
-    ESP8266_CHECK_IDLE(ESP8266);
-    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPMUX=", strlen("AT+CIPMUX="));
-    Transmit_UART(ESP8266_USART, (uint8_t*)&ch_mux, 1);   
-    Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
-  
-    if (Send_Command(ESP8266, ESP8266_COMMAND_CIPMUX, NULL, NULL) != ESP8266_OK) {
-        return ESP8266->last_result;
-    }
-
-    ESP8266_WAIT_READY_MACRO(ESP8266)
-    if (!ESP8266->Flags.last_operation_status) {
-        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
-    }
-     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
-}
-
-//====================================================================//
-//=============== Function Show Remort IP and Port  ==================//
-//====================================================================//
-ESP8266_Result ESP8266_Remote_IP_Port (ESP8266_Str* ESP8266, uint8_t enable) {
-   uint32_t string_length, count;
-    int16_t found_wrapper;
-    char char_received[128];
-    char dummy[2];
-    char ch_en = (char)(enable + '0');
-    
-    ESP8266_CHECK_IDLE(ESP8266);
-    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPDINFO=", strlen("AT+CIPDINFO="));
-    Transmit_UART(ESP8266_USART, (uint8_t*)&ch_en, 1);
-    Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
-
-    if (Send_Command(ESP8266, ESP8266_COMMAND_CIPDINFO, NULL, NULL) != ESP8266_OK) {
-        return ESP8266->last_result;
-    }
-
-	ESP8266_WAIT_READY_MACRO(ESP8266)
-    if (!ESP8266->Flags.last_operation_status) {
-        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
-    }
-    ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
-}
-
-
-//******************************************************************//
 //******** Initialize buffer and data structure of ESP8266 *********//
 //******************************************************************//
 ESP8266_Result ESP8266_Init(ESP8266_Str* const ESP8266, uint32_t baud_rate) {
@@ -992,18 +941,18 @@ ESP8266_Result ESP8266_Init(ESP8266_Str* const ESP8266, uint32_t baud_rate) {
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_DEVICE_NOT_CONNECTED);
     } 
     */
-    //ESP8266->timeout = 3;                    
-    //Send_Command(ESP8266, ESP8266_COMMAND_AT, "AT\r\n", "OK\r\n");
-    //ESP8266_WAIT_READY_MACRO(ESP8266)
-	  //
-    //if (!ESP8266->Flags.last_operation_status) {
-    //    ESP8266_RETURN_STATUS(ESP8266, ESP8266_DEVICE_NOT_CONNECTED);
-    //}   
-    //while (ESP8266_Multi_Connection(ESP8266, 1) != ESP8266_OK);
+    ESP8266->timeout = 3;                    
+    Send_Command(ESP8266, ESP8266_COMMAND_AT, "AT\r\n", "OK\r\n");
+    ESP8266_WAIT_READY_MACRO(ESP8266)
+	  
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_DEVICE_NOT_CONNECTED);
+    }   
+    while (ESP8266_Multi_Connection(ESP8266, 1) != ESP8266_OK);
     //
     //while (ESP8266_Remote_IP_Port(ESP8266, 1) != ESP8266_OK);
     //
-    //while (ESP8266_Set_Wifi_Mode(ESP8266, AP_STATION_MODE) != ESP8266_OK);
+    while (ESP8266_Set_Wifi_Mode(ESP8266, AP_STATION_MODE) != ESP8266_OK);
     //
     //while (ESP8266_Get_Station_MAC(ESP8266) != ESP8266_OK);
     //
@@ -1024,7 +973,7 @@ ESP8266_Result ESP8266_Init(ESP8266_Str* const ESP8266, uint32_t baud_rate) {
 //============================================================================================================//
 //================================= Function Get Data From Web   =============================================//
 //============================================================================================================//
-ESP8266_Result ESP8266_Get_Data_Web(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, char* domain_name) {
+ESP8266_Result ESP8266_Get_Data_Web(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, char* domain_name, char* connection_type) {
     uint32_t string_length, count;
     int16_t found_wrapper;
     char char_received[128];
@@ -1041,13 +990,59 @@ ESP8266_Result ESP8266_Get_Data_Web(ESP8266_Str* ESP8266, char* SSID_Wifi, char*
     sprintf(command, "AT+CIPDOMAIN=\"%s\"\r\n", domain_name);
     Send_Command(ESP8266, ESP8266_COMMAND_CIPDOMAIN, command, "+CIPDOMAIN");   
     ESP8266_WAIT_READY_MACRO(ESP8266)
-
     if (!ESP8266->Flags.last_operation_status) {
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
     }
 
+    sprintf(command, "AT+CIPSTART=\"%s\",\"%s\",80\r\n", connection_type, ESP8266->DNS_IP);
+    Send_Command(ESP8266, ESP8266_COMMAND_CIPSTART, command, "OK\r\n");
+    ESP8266_WAIT_READY_MACRO(ESP8266)
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+
+    sprintf(command, "AT+CIPSEND=%d\r\n", strlen("abcxyz"));
+    Send_Command(ESP8266, ESP8266_COMMAND_SEND_DATA, command, "OK\r\n");
+    ESP8266_WAIT_READY_MACRO(ESP8266)
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
+
+//============================================================================================================//
+//===================================== Make ESP8266 as server   =============================================//
+//============================================================================================================//
+ESP8266_Result ESP8266_Setting_WebServer(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, uint16_t port) {
+    uint32_t string_length, count;
+    int16_t found_wrapper;
+    char char_received[128];
+    char dummy[2];
+    char command[50];
+
+    //sprintf(command, "AT+CWJAP_CUR=\"%s\",\"%s\"\r\n", SSID_Wifi, password);
+    //Send_Command(ESP8266, ESP8266_COMMAND_CWJAP_SET, command, "OK\r\n");   
+    //ESP8266_WAIT_READY_MACRO(ESP8266)
+    //if (!ESP8266->Flags.last_operation_status) {
+    //    ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    //}
+
+    Send_Command(ESP8266, ESP8266_COMMAND_CIPAP, "AT+CIPAP_CUR?\r\n", "OK\r\n");
+    ESP8266_WAIT_READY_MACRO(ESP8266)
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+
+    //sprintf(command, "AT+CIPSERVER=1,%d\r\n", port);
+    //Send_Command(ESP8266, ESP8266_COMMAND_CIPSERVER, command, "OK\r\n");
+    //
+    //ESP8266_WAIT_READY_MACRO(ESP8266)
+    //if (!ESP8266->Flags.last_operation_status) {
+    //    ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    //}
+    ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
+}
+
 
 //=========================================================================================================//
 //====================================== Send Command to ESP8266 ==========================================//
@@ -1224,7 +1219,7 @@ void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buff
             }
             if (!strcmp(received, "OK\r\n")) {
                 ESP8266->current_command = ESP8266_COMMAND_IDLE;
-                //ESP8266_Callback_WifiIPSet(ESP8266);
+                ESP8266_Callback_WifiIPSet(ESP8266);
             }
             break;
                 
@@ -1255,6 +1250,7 @@ void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buff
                 ESP8266_CallBack_TCP_Connection_Fail(ESP8266);
             }
             else if (!strncmp(received, "ALREADY CONNECTED", 17)) {
+                ESP8266->Flags.last_operation_status = 1;
             }
     }
 
@@ -1274,7 +1270,7 @@ void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buff
 }
 
 //*******************************************************************************//
-//************************      CALL USER FUNCTION      *************************//
+//************************      CALL BACK FUNCTION      *************************//
 //*******************************************************************************//
 void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266) {
     ESP8266->Wifi_connect_error =  ESP8266_WifiConnect_OK;
@@ -1308,6 +1304,20 @@ void ESP8266_Callback_WifiConnectFailed(ESP8266_Str* ESP8266) {
        Transmit_UART(USART6, (uint8_t*)"Connection Failed\n", strlen("Connection Failed\n"));
        Transmit_UART(USART6, (uint8_t*)"Please check the connection again\n", strlen("Please check the connection again\n"));
    }
+}
+
+void ESP8266_Callback_WifiIPSet(ESP8266_Str* ESP8266) {
+    char ch_IP[5];
+    uint8_t idx = 0;
+    Transmit_UART(USART6, (uint8_t*)"Enter following URL to get HTML Web: ", strlen("Enter following URL to get HTML Web: "));
+    for (idx=0; idx < 4; idx++) {    
+        sprintf(ch_IP, "%d", ESP8266->AP_IP[idx]);
+        Transmit_UART(USART6, (uint8_t*)ch_IP, strlen(ch_IP));  
+        if (idx != 3) {
+            Transmit_UART(USART6, (uint8_t*)".", 1);
+        }
+    }
+    Transmit_UART(USART6, (uint8_t*)"\n\n", 2);
 }
 //*******************************************************************************//
 
@@ -1448,43 +1458,187 @@ ESP8266_Result ESP8266_Get_AP_IP(ESP8266_Str* ESP8266) {
     start_track = 0;
     return ESP8266->last_result;
 }
- 
-ESP8266_Wifi_connect_error_t Set_Data_Length(ESP8266_Str* ESP8266, int length) {
-    char sbuf[30];
 
-    //Set data length will be transmitted
-    sprintf(sbuf, "AT+CIPSEND=%d\r\n", length);
-    Transmit_UART(USART1, (uint8_t*)sbuf, strlen(sbuf));
 
-    //Wait for response
-    if (!strcmp(sbuf, "ERROR")) {
-        printf("Error when set data length\n");
-        ESP8266->Wifi_connect_error = ESP8266_Error_TCP_Connection;
-        //return ESP8266->Wifi_connect_error;
+//=============================================//
+//=========== Request sending data ============//
+//=============================================//
+ESP8266_Result ESP8266_Init_Sending_Data (ESP8266_Str* ESP8266, char* content) {
+    char length = strlen(content) + '0';
+    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPSEND=", strlen("AT+CIPSEND="));
+    Transmit_UART(ESP8266_USART, (uint8_t*)&length, 1);
+    Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
+
+    if (Send_Command(ESP8266, ESP8266_COMMAND_SEND_DATA, NULL, NULL) != ESP8266_OK) {
+        return ESP8266->last_result;
     }
-    else if (!strcmp(sbuf, "SEND FAIL")) {
-        printf("Send data TCP Fail\n");
-        ESP8266->Wifi_connect_error = ESP8266_Error_SendData_Fail;
-        return ESP8266->Wifi_connect_error;
-    }
-    else {
-        printf("Send data TCP OK"); 
-        ESP8266->Wifi_connect_error = ESP8266_WifiConnect_OK;
-    }
-    return ESP8266->Wifi_connect_error;
+
+    ESP8266->Flags.wait_for_wrapper = 1;
+    return ESP8266->last_result;
 }
 
-ESP8266_Wifi_connect_error_t Send_data_TCP(ESP8266_Str* ESP8266, char* data, int length) {
-    if (Set_Data_Length(ESP8266, length) != ESP8266_WifiConnect_OK) {
-        printf("Error when set data length\n");
+ESP8266_Result ESP8266_Multi_Connection(ESP8266_Str* ESP8266, uint8_t mux) {
+    char ch_mux = (char)(mux + '0');
+   uint32_t string_length, count;
+    int16_t found_wrapper;
+    char char_received[128];
+    char dummy[2];
+
+    ESP8266_CHECK_IDLE(ESP8266);
+    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPMUX=", strlen("AT+CIPMUX="));
+    Transmit_UART(ESP8266_USART, (uint8_t*)&ch_mux, 1);   
+    Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
+  
+    if (Send_Command(ESP8266, ESP8266_COMMAND_CIPMUX, NULL, NULL) != ESP8266_OK) {
+        return ESP8266->last_result;
     }
-    return ESP8266->Wifi_connect_error;
-//Send data to Web Browser for display, or GET HTTP 1.1
+
+    ESP8266_WAIT_READY_MACRO(ESP8266)
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
 
-//=================================================================//
-//====== Configuration baud rate and enable clockfor USART1 =======//
-//=================================================================//
+//====================================================================//
+//=============== Function Show Remort IP and Port  ==================//
+//====================================================================//
+ESP8266_Result ESP8266_Remote_IP_Port (ESP8266_Str* ESP8266, uint8_t enable) {
+   uint32_t string_length, count;
+    int16_t found_wrapper;
+    char char_received[128];
+    char dummy[2];
+    char ch_en = (char)(enable + '0');
+    
+    ESP8266_CHECK_IDLE(ESP8266);
+    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPDINFO=", strlen("AT+CIPDINFO="));
+    Transmit_UART(ESP8266_USART, (uint8_t*)&ch_en, 1);
+    Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
+
+    if (Send_Command(ESP8266, ESP8266_COMMAND_CIPDINFO, NULL, NULL) != ESP8266_OK) {
+        return ESP8266->last_result;
+    }
+
+	ESP8266_WAIT_READY_MACRO(ESP8266)
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+    ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
+}
+
+//====================================================================//
+//=============== Function Enable Server ESP8266  ==================//
+//====================================================================//
+ESP8266_Result ESP8266_Create_Server (ESP8266_Str* ESP8266, uint16_t port) {
+    uint32_t string_length, count;
+    int16_t found_wrapper;
+    char char_received[128];
+    char dummy[2], port_ch[7];
+
+    
+    //ESP8266_CHECK_IDLE(ESP8266);
+	sprintf(port_ch, "%d", port);
+
+    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CIPSERVER=1,", strlen("AT+CIPSERVER=1,"));
+    Transmit_UART(ESP8266_USART, (uint8_t*)port_ch, strlen(port_ch));
+    Transmit_UART(ESP8266_USART, (uint8_t*)"\r\n", 2);
+
+    if (Send_Command(ESP8266, ESP8266_COMMAND_CIPSERVER, NULL, NULL) != ESP8266_OK) {
+        return ESP8266->last_result;
+    }
+    ESP8266_WAIT_READY_MACRO(ESP8266)
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+    ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
+}
+
+//====================================================================//
+//=============== Function Disable Server ESP8266  ==================//
+//====================================================================//
+ESP8266_Result ESP8266_Delete_Server (ESP8266_Str* ESP8266) {
+    uint32_t string_length, count;
+    int16_t found_wrapper;
+    char char_received[128];
+    char dummy[2];
+
+    if (Send_Command(ESP8266, ESP8266_COMMAND_CIPSERVER, "AT+CIPSERVER=0\r\n", NULL) != ESP8266_OK) {
+        return ESP8266->last_result;
+    }
+    ESP8266_WAIT_READY_MACRO(ESP8266)
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+    ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
+}
+
+//====================================================================//
+//=================== Function Connect to Wifi  =====================//
+//====================================================================//
+ESP8266_Result ESP8266_Connect_Wifi (ESP8266_Str* ESP8266, char* ssid, char* password) {
+    uint32_t string_length, count;
+    int16_t found_wrapper;
+    char char_received[128];
+    char dummy[2];
+
+    Transmit_UART(ESP8266_USART, (uint8_t*)"AT+CWJAP_CUR=\"", strlen("AT+CWJAP_CUR=\""));
+    Transmit_UART(ESP8266_USART, (uint8_t*)ssid, strlen(ssid));
+    Transmit_UART(ESP8266_USART, (uint8_t*)"\",\"", strlen("\",\""));
+    Transmit_UART(ESP8266_USART, (uint8_t*)password, strlen(password));
+    Transmit_UART(ESP8266_USART, (uint8_t*)"\"\r\n", strlen("\"\r\n"));  
+    if (Send_Command(ESP8266, ESP8266_COMMAND_CWJAP_SET, NULL, NULL) != ESP8266_OK) {
+        return ESP8266->last_result;
+    }
+    ESP8266_WAIT_READY_MACRO(ESP8266)
+    if (!ESP8266->Flags.last_operation_status) {
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
+    }
+    ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
+}
+
+//====================================================================//
+//=================== Function Disconnect to Wifi  =====================//
+//====================================================================//
+ESP8266_Result ESP8266_Disconnect_Wifi (ESP8266_Str* ESP8266) {
+     return Send_Command(ESP8266, ESP8266_COMMAND_CWQAP, "AT+CWQAP\r\n", "AT+CWQAP");
+}
+
+//===================================================================//
+//================= Function send data to Web Browser ===============//
+//===================================================================//
+ESP8266_Result ESP8266_Server_Send_Data(ESP8266_Str* ESP8266) {
+    uint32_t string_length, count;
+    int16_t found_wrapper;
+    char char_received[128];
+    char dummy[2];
+
+    Buffer_t* buff;
+
+    if (!ESP8266->IPD.in_IPD_mode) {
+        Transmit_UART(USART6, (uint8_t*)"Error! ESP8266 is not in IPD mode\n", strlen("Error! ESP8266 is not in IPD mode\n"));
+        return ESP8266_ERROR;
+    }
+    buff = &USART_buffer;
+                                                
+    if ((ESP8266->current_command == ESP8266_COMMAND_SEND_DATA) && (ESP8266->Flags.wait_for_wrapper)) { 
+            found_wrapper = Buffer_Find(&USART_buffer, "> ", 2); 
+            if (found_wrapper == 0) {                            
+                Buffer_Read_String(&USART_buffer, dummy, 2);     
+            }                                                    
+            if (found_wrapper >= 0) {                            
+                Process_SendData(ESP8266);                       
+            }                                                    
+    }                                                                                                                        
+    count = sizeof(char_received)/sizeof(char);                  
+    string_length = Buffer_Read_String(&USART_buffer, char_received, count);    
+    while (string_length > 0) {                                                 
+        ParseReceived(ESP8266, char_received, 1, string_length);                
+        string_length = Buffer_Read_String(&USART_buffer, char_received, count);
+    }
+}
+//******************************************************************//
+//****** Configuration baud rate and enable clockfor USART1 *******//
+//*****************************************************************//
 void Debug_init_UART_Config(USART_TypeDef* USARTx, uint32_t baud_rate) {
     if (USARTx == USART1) {
 	      RCC_APB2PeriphClockCmd (RCC_APB2Periph_USART1, ENABLE);

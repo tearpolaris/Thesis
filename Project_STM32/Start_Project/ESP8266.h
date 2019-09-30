@@ -41,6 +41,8 @@
 #define ESP8266_COMMAND_CIPSTART       16
 #define ESP8266_COMMAND_CIPMUX         17
 #define ESP8266_COMMAND_CIPDINFO       18
+#define ESP8266_COMMAND_CIPSERVER      19
+#define ESP8266_COMMAND_CWQAP          20
 //#define 
 //#define 
 //#define 
@@ -186,6 +188,13 @@ typedef struct ESP8266_Flag{
     uint8_t DNS_connect_success;
 }ESP8266_Flag;
 
+typedef struct ESP8266_IPD {
+    uint8_t in_IPD_mode;
+    uint16_t pointer_dat;
+    uint16_t pointer_total;
+    uint8_t  connection_num;
+} ESP8266_IPD;
+
 typedef struct ESP8266_Str{
     uint32_t time;
 	  uint32_t start_time;
@@ -217,6 +226,7 @@ typedef struct ESP8266_Str{
     ESP8266_Connection_t connection[ESP8266_MAX_CONNECTIONS];
     ESP8266_Connection_t* send_data_connection;
     ESP8266_Flag Flags;
+    ESP8266_IPD IPD;
 } ESP8266_Str;
 	                         
 
@@ -272,6 +282,7 @@ void ESP8266_CallBack_DNS_Fail (ESP8266_Str* ESP8266);
 void ESP8266_CallBack_TCP_Connection_Fail(ESP8266_Str* ESP8266);
 void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266);
 void ESP8266_Callback_WifiConnectFailed(ESP8266_Str* ESP8266);
+void ESP8266_Callback_WifiIPSet(ESP8266_Str* ESP8266);
 /***************************************************************************/	
 	
 /**************************** ESP8266 FUNCTION *****************************/
@@ -283,10 +294,16 @@ ESP8266_Result ESP8266_WaitReady(ESP8266_Str* const ESP8266);
 ESP8266_Result ESP8266_Set_Wifi_Mode(ESP8266_Str* ESP8266, Wifi_Mode mode);
 ESP8266_Result ESP8266_Get_AP_IP(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_Get_AP_MAC(ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_Delete_Server (ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_Create_Server (ESP8266_Str* ESP8266, uint16_t port);
+ESP8266_Result ESP8266_Connect_Wifi (ESP8266_Str* ESP8266, char* ssid, char* password);
+ESP8266_Result ESP8266_Disconnect_Wifi (ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_Setting_WebServer(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, uint16_t port);
 void Connect_To_AP(char* ssid, char* password);
 ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command_str, char* start_respond);
 
-ESP8266_Result ESP8266_Get_Data_Web(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, char* domain_name);
+ESP8266_Result ESP8266_Get_Data_Web(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, char* domain_name, char* connection_type);
+ESP8266_Result ESP8266_Init_Sending_Data (ESP8266_Str* ESP8266, char* content);
 
 //Function testing for initialization
 ESP8266_Result ESP8266_Remote_IP_Port (ESP8266_Str* ESP8266, uint8_t enable);
