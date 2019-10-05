@@ -17,7 +17,7 @@
 #define ESP8266_CONNECTION_BUFFER_SIZE  5096
 
 #define ESP8266_MAX_AP_DETECTED 15
-#define ESP8266_MAX_CONNECTIONS 5
+//#define ESP8266_MAX_CONNECTIONS 5
 #define ESP8266_MAX_CONNECTION  5
 #define ESP8266_MAX_SSID_CHAR   32
 
@@ -43,15 +43,15 @@
 #define ESP8266_COMMAND_CIPDINFO       18
 #define ESP8266_COMMAND_CIPSERVER      19
 #define ESP8266_COMMAND_CWQAP          20
+#define ESP8266_COMMAND_CIPSENDBUF     21 
+#define ESP8266_COMMAND_CIPCLOSE       22 
 //#define 
 //#define 
 //#define 
 //#define 
-//#define 
-//#define 
-//#define 
-//#define 
-//#define 
+#define GET_WEB_PAGE 0 
+#define TURN_LED_ON  1 
+#define TURN_LED_OFF 2 
 
 typedef enum {
     ESP8266_ECN_OPEN = 0x0,
@@ -75,7 +75,7 @@ typedef struct {
     ESP8266_Connect_Type connect_type;//connect type is TCP or SSL
     uint32_t byte_received;//number of bytes received
     uint32_t total_byte_received;
-    uint8_t wait_for_wrapper;
+    //uint8_t wait_for_wrapper;
     uint8_t wait_for_respond;
     char* data;
     uint16_t data_size;
@@ -84,7 +84,8 @@ typedef struct {
     //char* name; reserved for cilent 
     uint8_t header_done;
     uint8_t first_packet;
-    uint8_t last_activity;
+    uint8_t call_data_received;
+    //uint8_t last_activity;
 } ESP8266_Connection_t;
 
 typedef struct {
@@ -223,7 +224,7 @@ typedef struct ESP8266_Str{
     ESP8266_Connected_Wifi_t connected_Wifi;
     Encrypt_Method_t encrypt_method;
     ESP8266_Connected_Multi_Station_t connected_stations;
-    ESP8266_Connection_t connection[ESP8266_MAX_CONNECTIONS];
+    ESP8266_Connection_t connection[ESP8266_MAX_CONNECTION];
     ESP8266_Connection_t* send_data_connection;
     ESP8266_Flag Flags;
     ESP8266_IPD IPD;
@@ -263,6 +264,7 @@ void Transmit_UART_Enable(USART_TypeDef* USARTx,  FunctionalState NewState);
 void Clear_UART_TxE(USART_TypeDef* USARTx);
 void Init_ESP_GPIO(void);
 void Transmit_UART(USART_TypeDef* USARTx, uint8_t* dat, uint16_t count);
+void Transmit_string_UART(USART_TypeDef* USARTx, char* dat);
 char UART_GetChar (USART_TypeDef* USARTx);
 char* Receive_UART(USART_TypeDef* USARTx, int num_char_receive);
 void  Init_USART1_RXNE_Interrupt(void);
@@ -283,6 +285,10 @@ void ESP8266_CallBack_TCP_Connection_Fail(ESP8266_Str* ESP8266);
 void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266);
 void ESP8266_Callback_WifiConnectFailed(ESP8266_Str* ESP8266);
 void ESP8266_Callback_WifiIPSet(ESP8266_Str* ESP8266);
+void ESP8266_CallBack_Client_ConnectionData_Received(ESP8266_Str* ESP8266, ESP8266_Connection_t* connection, char* data);
+void ESP8266_CallBack_Server_ConnectionData_Received(uint8_t command);
+void ESP8266_Call_Connection_CallBack(ESP8266_Str* ESP8266);
+
 /***************************************************************************/	
 	
 /**************************** ESP8266 FUNCTION *****************************/
@@ -299,8 +305,11 @@ ESP8266_Result ESP8266_Create_Server (ESP8266_Str* ESP8266, uint16_t port);
 ESP8266_Result ESP8266_Connect_Wifi (ESP8266_Str* ESP8266, char* ssid, char* password);
 ESP8266_Result ESP8266_Disconnect_Wifi (ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_Setting_WebServer(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, uint16_t port);
+ESP8266_Result ESP8266_Server_Waiting_For_Request(ESP8266_Str* ESP8266);
+ESP8266_Result ESP8266_Close_Connection(ESP8266_Str* ESP8266, uint8_t connection_num);
 void Connect_To_AP(char* ssid, char* password);
 ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command_str, char* start_respond);
+ESP8266_Result ESP8266_Length_TCP_Buffer(ESP8266_Str* ESP8266, uint8_t connection_num, uint32_t data_length);
 
 ESP8266_Result ESP8266_Get_Data_Web(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, char* domain_name, char* connection_type);
 ESP8266_Result ESP8266_Init_Sending_Data (ESP8266_Str* ESP8266, char* content);
