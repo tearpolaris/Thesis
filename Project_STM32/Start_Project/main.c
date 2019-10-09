@@ -20,11 +20,9 @@ int main(void) {
     //Transmit_UART(USART6, (uint8_t*)"Beautiful weather", strlen("Beautiful weather"));
     ret = ESP8266_Init(&ESP8266, 115200);
     if (ret == ESP8266_OK) {
-        Transmit_UART(USART6, (uint8_t*)"Initialization ESP8266 successfully\n", (strlen)("Initialization ESP8266 successfully\n"));
-        //GPIO_SetBits(GPIOD, GPIO_Pin_15);
+        Transmit_UART(USART6, (uint8_t*)"\rInitialization ESP8266 successfully\n", (strlen)("Initialization ESP8266 successfully\n"));
     } 
     ESP8266_Setting_WebServer(&ESP8266, "D-Link_DIR-612", "nhatro2129", 80);
-    //GPIOD->ODR = (uint16_t)ESP8266.AP_IP[0];
     while(1) {
     }
 		//return 0;

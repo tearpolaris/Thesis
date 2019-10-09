@@ -277,6 +277,8 @@ void Init_Debug_GPIO(void);
 /***************************************************************************/					
 void Init_Counter_ESP8266(TIM_TypeDef* TIMx);//Frequency is 40 MHz
 void Init_Interrupt_TIM3(void);
+void Start_Track_TimeOut(void);
+void Stop_Track_TimeOut(void);
 /**************************************************************************/
 
 /*************************** CALL BACK USER FUNCTION ***********************/		
@@ -286,7 +288,7 @@ void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266);
 void ESP8266_Callback_WifiConnectFailed(ESP8266_Str* ESP8266);
 void ESP8266_Callback_WifiIPSet(ESP8266_Str* ESP8266);
 void ESP8266_CallBack_Client_ConnectionData_Received(ESP8266_Str* ESP8266, ESP8266_Connection_t* connection, char* data);
-void ESP8266_CallBack_Server_ConnectionData_Received(uint8_t command);
+ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8266, uint8_t command, uint8_t connect_num);
 void ESP8266_Call_Connection_CallBack(ESP8266_Str* ESP8266);
 
 /***************************************************************************/	
@@ -307,6 +309,7 @@ ESP8266_Result ESP8266_Disconnect_Wifi (ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_Setting_WebServer(ESP8266_Str* ESP8266, char* SSID_Wifi, char* password, uint16_t port);
 ESP8266_Result ESP8266_Server_Waiting_For_Request(ESP8266_Str* ESP8266);
 ESP8266_Result ESP8266_Close_Connection(ESP8266_Str* ESP8266, uint8_t connection_num);
+ESP8266_Result Parse_IPD_Data_Received(ESP8266_Str* ESP8266, char* received, uint16_t bufflen);
 void Connect_To_AP(char* ssid, char* password);
 ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command_str, char* start_respond);
 ESP8266_Result ESP8266_Length_TCP_Buffer(ESP8266_Str* ESP8266, uint8_t connection_num, uint32_t data_length);
