@@ -333,6 +333,7 @@ void ParseCWLIF(ESP8266_Str* ESP8266, char* received);
 void ParseCWSAP(ESP8266_Str* ESP8266, char* received);
 void ParseIP(char* IP_str, uint8_t* arr, uint8_t* cnt);
 void ParseMAC(char* ptr, uint8_t* arr, uint8_t* cnt);
+void Handle_Request_Browser(ESP8266_Str* ESP8266);
 
 uint8_t Hex_To_Num(char ch);								
 uint8_t Char_Is_Hex(char ch);

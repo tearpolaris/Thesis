@@ -23,6 +23,7 @@ int main(void) {
         Transmit_UART(USART6, (uint8_t*)"\rInitialization ESP8266 successfully\n", (strlen)("Initialization ESP8266 successfully\n"));
     } 
     ESP8266_Setting_WebServer(&ESP8266, "D-Link_DIR-612", "nhatro2129", 80);
+    Handle_Request_Browser(&ESP8266);    
     while(1) {
     }
 		//return 0;

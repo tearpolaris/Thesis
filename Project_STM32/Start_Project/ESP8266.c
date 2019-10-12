@@ -1367,7 +1367,18 @@ ESP8266_Result Parse_IPD_Data_Received(ESP8266_Str* ESP8266, char* received, uin
         //================================== Process IPD data ================================//
         if (strstr(received, "GET / HTTP/1.1")) { //Request get web page
             while (Buffer_Read_String(&USART_buffer, buff_read, sizeof(buff_read)/sizeof(buff_read[0])) > 0) {
-            }        
+            }    
+            ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, GET_WEB_PAGE, connect->number);    
+        }
+        else if (strstr(received, "GET /LED=ON")) {
+            while (Buffer_Read_String(&USART_buffer, buff_read, sizeof(buff_read)/sizeof(buff_read[0])) > 0) {
+            }    
+            ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, TURN_LED_ON, connect->number);
+        }
+        else if (strstr(received, "GET /LED=OFF")) {
+            while (Buffer_Read_String(&USART_buffer, buff_read, sizeof(buff_read)/sizeof(buff_read[0])) > 0) {
+            }    
+            ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, TURN_LED_OFF, connect->number);
         }
         
         //ParseIP(&received[ipd_pointer_dat], connect->remote_IP, &byte_count);
@@ -1508,7 +1519,6 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
                 break;
             }
         }
-      GPIO_SetBits(GPIOD, GPIO_Pin_13);
         //if TIMEOUT elapsed and no wrapper is received - return ERROR
         if (track_time_out >= ESP8266->timeout) {
             Transmit_string_UART(USART6, "Command AT+CIPSENDBUF: there is no wrapper > after sending TCP buffer length\r\n");
@@ -1536,9 +1546,16 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
         }
 
         ESP8266->current_command = ESP8266_COMMAND_IDLE;
+        ESP8266->IPD.in_IPD_mode = 0;//no in IPD mode anymore
         //Close connection to browser
         ESP8266_Close_Connection(ESP8266, ESP8266->IPD.connection_num); 
-        GPIO_SetBits(GPIOD, GPIO_Pin_12);
+        //GPIO_SetBits(GPIOD, GPIO_Pin_12);
+    }
+    else if (command == TURN_LED_ON) {
+        GPIO_SetBits(GPIOD, GPIO_Pin_0);
+    }
+    else if (command == TURN_LED_OFF) {
+        GPIO_ResetBits(GPIOD, GPIO_Pin_0);
     }
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
@@ -1900,7 +1917,6 @@ ESP8266_Result ESP8266_Server_Waiting_For_Request(ESP8266_Str* ESP8266) {
     string_length = Buffer_Read_String(&USART_buffer, char_received, count);   
     while (!ESP8266->IPD.in_IPD_mode) {
         if (string_length > 0) {
-            Transmit_UART(USART6, (uint8_t*)char_received, strlen(char_received));
             Parse_IPD_Data_Received(ESP8266, char_received, count); 
         }                                              
         //ParseReceived(ESP8266, char_received, 1, string_length);                 
@@ -1978,6 +1994,24 @@ void Start_Track_TimeOut(void) {
 void Stop_Track_TimeOut(void) {
     track_time_out = 0;
     start_track = 0;
+}
+
+//******************************************************************//
+//******** Handle request from browser ********//
+//*****************************************************************//
+void Handle_Request_Browser(ESP8266_Str* ESP8266) {
+    uint32_t string_length, count;
+    char char_received[128];
+
+    count = sizeof(char_received)/sizeof(char);                  
+    string_length = Buffer_Read_String(&USART_buffer, char_received, count);  
+    while (1) {
+        if (string_length > 0) {
+            Parse_IPD_Data_Received(ESP8266, char_received, count); 
+        }                                              
+        //ParseReceived(ESP8266, char_received, 1, string_length);                 
+        string_length = Buffer_Read_String(&USART_buffer, char_received, count);  
+    }
 }
 
 //******************************************************************//
