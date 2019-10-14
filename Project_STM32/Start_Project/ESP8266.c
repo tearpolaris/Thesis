@@ -1,10 +1,10 @@
 #include "ESP8266.h"
 #include "LCD.h"
-
-#define __DEBUG__
+#include "DHT22.h"
 
 #define CHAR_TO_NUM(x)  ((x) - '0')
 #define CHAR_IS_NUM(x)   ((x) >= '0') && ((x) <= '9')
+extern uint16_t dat_humid, dat_temp;
 //===============================
 #define ESP8266_UPDATE_MACRO(ESP8266)                    \
     if(ESP8266->timeout == 0) {                          \
@@ -39,6 +39,7 @@
 
 #define ESP8266_CHECK_IDLE(ESP8266)                           \
     if ((ESP8266)->current_command != ESP8266_COMMAND_IDLE) { \
+        GPIO_SetBits(GPIOD, GPIO_Pin_14);                     \
         ESP8266_UPDATE_MACRO(ESP8266)                         \
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_BUSY);         \
      }
@@ -63,7 +64,51 @@
 //============================================================
 
 #define  ESP8266_RESET_CONNECTIONS(ESP8266)  memset((uint8_t*)&ESP8266->connected_Wifi, 0, sizeof(ESP8266->connected_Wifi)); 
-//#define LINK_ICON "<link rel="icon" href="data:image/x-icon;base64,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/v7+/v7+/v7+/v7+/v6XJgb+/v7+/v7+/v7//f/8//3+/v7+/v76//76//3+/v7//f/+/v7+/v7+/v7SihT+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v6RKwCRKwGYNQH+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7fixTahxPWhxj+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v6RKwCRKwGRKwGRKwD5//7+/v7+/v7+/v7+/v7+/v7+/v7//v/ahxPahxPahxPWhxj+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v6RKwCRKwGRKwGRKwGRKwGTKQT+/v7+/v7+/v7///vciBHahxPahxPahxPahxPWhxj+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v6RKwCRKwGRKwGRKwGRKwGRKwGRKwGLLAHVhRDahxPahxPahxPahxPahxPahxPWhxj+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v6RKwCRKwGRKwGRKwGRKwGRKwGRKwGRKwHahxPahxPahxPahxPahxPahxPahxPWhxj+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v6RKwCRKwGRKwGRKwGRKwGRKwGRKwGRKwHahxPahxPahxPahxPahxPahxPahxPWhxj+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v6RKwCRKwGRKwGRKwGRKwGRKwGRKwGRKwHahxPahxPahxPahxPahxPahxPahxPWhxj+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v6RKwCRKwGRKwGRKwGRKwGRKwGRKwGRKwHahxPahxPahxPahxPahxPahxPahxPWhxj+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v78//ubJwCRKwGRKwGRKwGRKwGRKwGRKwHahxPahxPahxPahxPahxPahxP//87+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v76//qRKwGRKwGRKwGRKwGRKwHahxPahxPahxPahxPYhxT///r+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7/+/6RKwGRKwGRKwHahxPahxPahxP//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7//v+RKwHahxP69vH+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v78//38/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==" type="image/x-icon"/>\r\n"
+
+#define  ESP8266_SERVER_RESPONSE(ESP8266, header_content, body_content) \
+    ESP8266_Length_TCP_Buffer(ESP8266, ESP8266->IPD.connection_num, strlen(header_content)+strlen(body_content)); \
+    ESP8266->timeout = 5;                                                                     \
+    Start_Track_TimeOut();                                                                    \
+    while (track_time_out < ESP8266->timeout) {                                               \
+        if ((step = Buffer_Find(&USART_buffer, "> ", 2)) >= 0) {                              \
+            if ((USART_buffer.read_idx + step) > USART_buffer.size) {                         \
+                GPIO_SetBits(GPIOD, GPIO_Pin_15);                                             \
+                USART_buffer.read_idx = USART_buffer.read_idx + step - USART_buffer.size + 2; \
+            }                                             \
+            else {                                        \
+                USART_buffer.read_idx += step + 2;        \
+            }                                             \
+            break;                                        \
+        }                                                 \
+    }                                                     \
+    if (track_time_out >= ESP8266->timeout) {             \
+        Transmit_string_UART(USART6, "Command AT+CIPSENDBUF: there is no wrapper > after sending TCP buffer length\r\n"); \
+        ESP8266_RETURN_STATUS(ESP8266,ESP8266_ERROR);                                                                     \
+    }                                                                                                                     \
+    Start_Track_TimeOut();                                                                                                \
+    ESP8266->timeout = 20;                                                                                                \
+    Transmit_string_UART(ESP8266_USART, header_content);                                                                  \
+    Transmit_string_UART(ESP8266_USART, body_content);                                                                    \
+    while (track_time_out < ESP8266->timeout) {                                                                           \
+        if ((step = Buffer_Find(&USART_buffer, "SEND OK", 7)) >= 0) {                                                     \
+            if ((USART_buffer.read_idx + step) > USART_buffer.size) {                                                     \
+                USART_buffer.read_idx = USART_buffer.read_idx + step - USART_buffer.size + 7;                             \
+            }                                                                                                             \
+            else {                                                                                                        \
+                USART_buffer.read_idx += step + 7;                                                                        \
+            }                                                                                                             \
+            break;                                                                                                        \
+        }                                                                                                                 \
+    }                                                                                                                     \
+    if (track_time_out >= ESP8266->timeout) {                                                                             \
+        Transmit_string_UART(USART6, "Command AT+CIPCLOSE: there is no SEND OK string\r\n");                              \
+        ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR;)              \
+    }                                                               \
+    ESP8266->current_command = ESP8266_COMMAND_IDLE;                \
+    ESP8266->IPD.in_IPD_mode = 0;                                   \
+    ESP8266_Close_Connection(ESP8266, ESP8266->IPD.connection_num); \
+    Stop_Track_TimeOut();
+//====================================================
 uint16_t track_USART_data = 0;
 uint8_t track_time_out = 0;
 unsigned char start_track = 0;
@@ -72,9 +117,6 @@ static Buffer_t USART_buffer;
 static uint8_t USART_data[USART_ESP8266_SIZE];
 static uint32_t ESP8266_baud_rate[] = {9600,  57600, 115200, 921600};
 
-#ifdef __DEBUG__
-    uint16_t debug = 0;
-#endif
 /******************************** BUFFER FUNCTION **************************
 1. This is circular buffer, have a fixed-number size
 2. Have two pointer, head and tail (in code is write_idx - head pointer
@@ -113,11 +155,14 @@ uint32_t Buffer_Write_Free(Buffer_t* buff) {
 //========== Return number of free bytes to read ===========//
 //==========================================================//
 uint32_t Buffer_Read_Free(Buffer_t* buff) {
+      //char debug[10];
       uint32_t in, out, num_byte_free;
     
       in = buff->write_idx;
       out = buff->read_idx;
     
+    //sprintf(debug, "Write index and read index is %d and %d\r\n", in, out);
+    //Transmit_string_UART(USART6, debug);
     if (buff == NULL) {
           return 0;
         }
@@ -159,10 +204,10 @@ uint32_t Buffer_Write(Buffer_t* buff, uint32_t count, uint8_t* dat) {
     }
 
     while (max_allow_write--) {
-            buff->Data[buff->write_idx] = *dat;
+        buff->Data[buff->write_idx] = *dat;
         buff->write_idx++;
-        dat++;       
-            if (buff->write_idx > buff->size) {
+        dat++;
+        if (buff->write_idx >= buff->size) {
             buff->write_idx = 0;
         }
         num_write++;
@@ -201,7 +246,7 @@ uint32_t Buffer_Read(Buffer_t* buff, uint32_t count, uint8_t* ret_buff) {
         *ret_buff = buff->Data[buff->read_idx++];
         ret_buff++;
             
-        if (buff->read_idx > buff-> size) {
+        if (buff->read_idx >= buff-> size) {
                 buff->read_idx = 0;
         }
         num_read++;
@@ -276,7 +321,6 @@ int8_t Buffer_Init(Buffer_t* buffer, uint32_t size, uint8_t* buff_main) {
     buffer->Data = buff_main;
     buffer->End_String = '\n';
 
-    printf("write_idx is %d\n", buffer->write_idx);
     if(!buffer->Data) {
         buffer->Data = (uint8_t*)malloc(size*sizeof(uint8_t));
         if(!buffer->Data) {
@@ -319,17 +363,23 @@ int32_t Buffer_Find_Element(Buffer_t* buffer, uint8_t Element) {
 
 /****************** Find String in buffer with specified number ************/
 int32_t Buffer_Find(Buffer_t* buffer, char* string_find, uint32_t num_find) { 
-    uint32_t read_reserved, out, idx, ret_val;   
+    uint32_t out, idx, ret_val;   
     uint8_t found;
-    
+    int32_t read_reserved;
+    //char dbg[20];
     read_reserved = Buffer_Read_Free(buffer);
-    ret_val = 0;
+    if (read_reserved == 33) {
+        GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+    }
+    //sprintf(dbg, "Reserved is %d\r\n", read_reserved);
+    //Transmit_string_UART(USART6, dbg);
+    ret_val = found = idx = 0;
     if (read_reserved < num_find) {
         return -1;
     }
      
     out = buffer->read_idx;
-    while (read_reserved) {
+    while (read_reserved > 0) {
         if (string_find[0] == buffer->Data[out]) {
             found = 1;
             idx = 1;
@@ -338,7 +388,7 @@ int32_t Buffer_Find(Buffer_t* buffer, char* string_find, uint32_t num_find) {
         out++;
         ret_val++;
          
-        if (out > buffer->size) {
+        if (out >= buffer->size) {
             out = 0;
         }
          
@@ -400,8 +450,6 @@ void Init_USART1_RXNE_Interrupt(void) {
 //==========================================================================//
 void USART1_IRQHandler(void) {
     if (USART_GetITStatus(ESP8266_USART, USART_IT_RXNE)) {
-        //while (!USART_GetFlagStatus(ESP8266_USART, USART_FLAG_RXNE)) {
-        //}
         uint8_t dat = (uint8_t)USART_ReceiveData(ESP8266_USART);
         Buffer_Write(&USART_buffer, 1, &dat);
     }
@@ -439,6 +487,7 @@ void Transmit_UART(USART_TypeDef* USARTx, uint8_t* dat, uint16_t count) {
 void Transmit_string_UART(USART_TypeDef* USARTx, char* dat) {
     uint16_t count = strlen(dat);
     while (count) {
+        GPIO_SetBits(GPIOD, GPIO_Pin_15);
         while (!USART_GetFlagStatus(USARTx, USART_FLAG_TXE)) {
         }
         USART_SendData (USARTx, (uint16_t)*dat);
@@ -819,7 +868,6 @@ void ParseCIPSTA(ESP8266_Str* ESP8266, char* received) {
     }
 
     if (command == ESP8266_COMMAND_CIPSTA) {
-        //GPIO_SetBits(GPIOD, GPIO_Pin_12);
         switch(type) {
             case 1:
                 ParseIP(&received[pos+2], ESP8266->STA_IP, NULL);
@@ -906,7 +954,6 @@ ESP8266_Result ESP8266_Init(ESP8266_Str* const ESP8266, uint32_t baud_rate) {
     if(Buffer_Init(&USART_buffer, USART_ESP8266_SIZE, USART_data)) {
         return ESP8266_MALLOC_ERR;
     }
-    printf("Size of USART buffer is %d\n", USART_buffer.size);
     //Initialize GPIO Pin 
     Init_ESP_GPIO();
 
@@ -1047,7 +1094,7 @@ ESP8266_Result ESP8266_Setting_WebServer(ESP8266_Str* ESP8266, char* SSID_Wifi, 
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
     }
 
-    ESP8266_Server_Waiting_For_Request(ESP8266);
+    //ESP8266_Server_Waiting_For_Request(ESP8266);
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
 
@@ -1285,7 +1332,6 @@ void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buff
         case ESP8266_COMMAND_CIPDOMAIN:
             if (!strncmp(received, "+CIPDOMAIN", 10)) {
                 //Transmit_UART(USART6, (uint8_t*)received, strlen(received));
-                //GPIO_SetBits(GPIOD, GPIO_Pin_12);
                 //ParseIP(received+11, ESP8266->DNS_IP, &byte_count); 
                 strcpy(ESP8266->DNS_IP, &received[11]);
                 if (ESP8266->Wifi_connect_error == ESP8266_DNS_Connect_Fail) {
@@ -1367,10 +1413,37 @@ ESP8266_Result Parse_IPD_Data_Received(ESP8266_Str* ESP8266, char* received, uin
         //================================== Process IPD data ================================//
         if (strstr(received, "GET / HTTP/1.1")) { //Request get web page
             while (Buffer_Read_String(&USART_buffer, buff_read, sizeof(buff_read)/sizeof(buff_read[0])) > 0) {
+                if (!strcmp(buff_read, "\r\n")) {
+                    break;
+                }
             }    
             ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, GET_WEB_PAGE, connect->number);    
         }
-        else if (strstr(received, "GET /LED=ON")) {
+        else if (strstr(received, "GET /readADC")) {
+            while (Buffer_Read_String(&USART_buffer, buff_read, sizeof(buff_read)/sizeof(buff_read[0])) > 0) {
+                if (!strcmp(buff_read, "\n")) {
+                    break;
+                }
+            }    
+            ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, ADC_READ_VALUE, connect->number);
+        }
+        else if (strstr(received, "GET /setLED?LEDstate=1")) {
+            while (Buffer_Read_String(&USART_buffer, buff_read, sizeof(buff_read)/sizeof(buff_read[0])) > 0) {
+                if (!strcmp(buff_read, "\n")) {
+                    break;
+                }
+            }    
+            ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, TURN_LED_ON, connect->number);
+        }
+        else if (strstr(received, "GET /setLED?LEDstate=0")) {
+            while (Buffer_Read_String(&USART_buffer, buff_read, sizeof(buff_read)/sizeof(buff_read[0])) > 0) {
+                if (!strcmp(buff_read, "\r\n")) {
+                    break;
+                }
+            }    
+            ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, TURN_LED_OFF, connect->number);
+        } 
+       else if (strstr(received, "GET /LED=ON")) {
             while (Buffer_Read_String(&USART_buffer, buff_read, sizeof(buff_read)/sizeof(buff_read[0])) > 0) {
             }    
             ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, TURN_LED_ON, connect->number);
@@ -1379,8 +1452,7 @@ ESP8266_Result Parse_IPD_Data_Received(ESP8266_Str* ESP8266, char* received, uin
             while (Buffer_Read_String(&USART_buffer, buff_read, sizeof(buff_read)/sizeof(buff_read[0])) > 0) {
             }    
             ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, TURN_LED_OFF, connect->number);
-        }
-        
+        }        
         //ParseIP(&received[ipd_pointer_dat], connect->remote_IP, &byte_count);
 
         //ipd_pointer_dat += byte_count + 1;
@@ -1413,8 +1485,6 @@ ESP8266_Result Parse_IPD_Data_Received(ESP8266_Str* ESP8266, char* received, uin
 //*******************************************************************************//
 void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266) {
     ESP8266->Wifi_connect_error =  ESP8266_WifiConnect_OK;
-    printf("Connect Wifi succefully!\n");
-    printf("SSID: %s\n", ESP8266->connected_Wifi.SSID);
 }
 
 //==============================================================================//
@@ -1422,7 +1492,6 @@ void ESP8266_Callback_Wifi_Connected(ESP8266_Str* ESP8266) {
 //==============================================================================//
 void ESP8266_CallBack_DNS_Fail (ESP8266_Str* ESP8266) {
     ESP8266->Wifi_connect_error = ESP8266_DNS_Connect_Fail;
-    printf("DNS Connect FAIL!\n");
 }
 
 //==============================================================================//
@@ -1430,7 +1499,6 @@ void ESP8266_CallBack_DNS_Fail (ESP8266_Str* ESP8266) {
 //==============================================================================//
 void ESP8266_CallBack_TCP_Connection_Fail(ESP8266_Str* ESP8266) {
     ESP8266->Wifi_connect_error = ESP8266_Error_TCP_Connection;
-    printf("TCP Connection FAIL!\n");
 }
 
 //==============================================================================//
@@ -1482,6 +1550,7 @@ void ESP8266_Callback_WifiIPSet(ESP8266_Str* ESP8266) {
 //=============================                GET / : Send data web page HTML         ===================================//
 //========================================================================================================================//
 ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8266, uint8_t command, uint8_t connect_num) {
+    /*
     char* content = "<!DOCTYPE html>\r\n"
 		                "<html>\r\n"
 		                "<head>\r\n"
@@ -1501,13 +1570,69 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
 					          "</body>\r\n"
 					          "</html>"
 					          "\r\n\r\n\r\n";
+    */
+    char* content = "<!DOCTYPE html>\r\n"
+                    "<html>\r\n"
+		                "<head>\r\n"
+					          "<meta charset=\"UTF-8\">\r\n"
+					          "<meta name=\"description\" content=\"Thesis IoT\">\r\n"
+					          "<meta name=\"author\" content=\"AV\">\r\n"
+					          "<title>Luan van tot nghiep</title>\r\n"
+					          "<link rel=\"icon\" href=\"data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAS0lEQVR42s2SMQ4AIAjE+P+ncSY"
+                    "dasgNXMJgcyIIlVKPIKdvioAXyWBeJmVpqRZKWtj9QWAKZyWll50b8IcL9JUeQF50n28ckyb0ADG8RLwp05YBAAAAAElFTkSuQmCC\" type=\"image/x-icon\" />\r\n"
+					          "<head/>\r\n"
+                    "<body>\r\n"
+                    "<div id=\"demo\">\r\n"
+                    "<h1>The ESP8266 NodeMCU Update web page without refresh</h1>\r\n"
+                    "	<button type=\"button\" onclick=\"sendData(1)\">LED ON</button>\r\n"
+                    "	<button type=\"button\" onclick=\"sendData(0)\">LED OFF</button><br/>\r\n"
+                    "</div>\r\n"
+                    "<div>\r\n"
+                    "ADC Value is : <span id=\"ADCValue\">0</span><br>"
+                    "LED State is : <span id=\"LEDState\">NA</span>\r\n"
+                    "</div>\r\n"
+                    "<script>\r\n"
+                    "function sendData(led) {\r\n"
+                    "  var xhttp = new XMLHttpRequest();\r\n"
+                    "  xhttp.onreadystatechange = function() {\r\n"
+                    "    if (this.readyState == 4 && this.status == 200) {\r\n"
+                    "      document.getElementById(\"LEDState\").innerHTML =\r\n"
+                    "      this.responseText;\r\n"
+                    "    }\r\n"
+                    "  };\r\n"
+                    "  xhttp.open(\"GET\", \"setLED?LEDstate=\"+led, true);\r\n"
+                    "  xhttp.send();\r\n"
+                    "}\r\n"
+                    "setInterval(function() {\r\n"
+                    "getData();\r\n"
+                    "}, 30000);\r\n"
+                    "function getData() {\r\n"
+                    "var xhttp = new XMLHttpRequest();\r\n"
+                    "xhttp.onreadystatechange = function() {\r\n"
+                    "  if (this.readyState == 4 && this.status == 200) {\r\n"
+                    "    document.getElementById(\"ADCValue\").innerHTML =\r\n"
+                    "    this.responseText;"
+                    "  }\r\n"
+                    "};\r\n"
+                    "xhttp.open(\"GET\", \"readADC\", true);\r\n"
+                    "xhttp.send();\r\n"
+                    "}\r\n"
+                    "</script>\r\n"
+                    "</body>\r\n"
+                    "</html>\r\n\r\n\r\n";
 
     char* response_HTTP =  "HTTP/1.1 200 OK\r\n"
                            "Content-Type: text/html"
                            "\r\n\r\n";
+
+   char* response_ajax  = "HTTP/1.1 200 OK\r\n"
+                          "Content-Type: text/plain"
+                          "\r\n\r\n";
+   char ADC_value[10];
+   static uint8_t ADC_num = 0;
+   int32_t step = 0;
     
     if (command == GET_WEB_PAGE) {
-        GPIO_SetBits(GPIOD, GPIO_Pin_15);
         //Set TCP length buffer
         ESP8266_Length_TCP_Buffer(ESP8266, connect_num, strlen(content)+strlen(response_HTTP));
 
@@ -1515,7 +1640,19 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
         ESP8266->timeout = 5;
         Start_Track_TimeOut();
         while (track_time_out < ESP8266->timeout) { 
-            if (Buffer_Find(&USART_buffer, "> ", 2) >= 0) {
+            if ((step = Buffer_Find(&USART_buffer, "> ", 2)) >= 0) {
+                if ((USART_buffer.read_idx + step) >= USART_buffer.size) {
+                    USART_buffer.read_idx = USART_buffer.read_idx + step - USART_buffer.size + 2;
+                }
+                else {
+                    USART_buffer.read_idx += step + 2;
+                }
+                //sprintf(ADC_value, "%d %d %c\r\n", USART_buffer.read_idx, USART_buffer.write_idx, USART_data[USART_buffer.read_idx -2]);
+                //Transmit_string_UART(USART6, ADC_value);
+                //Transmit_string_UART(USART6, "==============\r\n");
+                //for (int x = (USART_buffer.read_idx-10); x < USART_buffer.size; x++) { 
+                //   Transmit_UART(USART6, (uint8_t*)&USART_data[x], 1);
+                //}
                 break;
             }
         }
@@ -1536,7 +1673,20 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
 
         //Waiting for receiving SEND OK
         while (track_time_out < ESP8266->timeout) {                      
-            if (Buffer_Find(&USART_buffer, "SEND OK", 7) >= 0) {
+            if ((step = Buffer_Find(&USART_buffer, "SEND OK", 7)) >= 0) {
+                if ((USART_buffer.read_idx + step) >= USART_buffer.size) {
+                    USART_buffer.read_idx = USART_buffer.read_idx + step - USART_buffer.size + 7;
+                }
+                else {
+                    USART_buffer.read_idx += step + 7;
+                }
+                //sprintf(ADC_value, "%d %d\r\n", USART_buffer.read_idx, USART_buffer.write_idx);
+                //Transmit_string_UART(USART6, ADC_value);
+               // Transmit_string_UART(USART6, "***************\r\n");
+                //for (int x = (USART_buffer.read_idx-10); x < USART_buffer.write_idx; x++) { 
+                //    Transmit_UART(USART6, (uint8_t*)&USART_data[x], 1);
+                //}
+                //USART_buffer.read_idx += step;
                 break;
             }
         }
@@ -1549,13 +1699,89 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
         ESP8266->IPD.in_IPD_mode = 0;//no in IPD mode anymore
         //Close connection to browser
         ESP8266_Close_Connection(ESP8266, ESP8266->IPD.connection_num); 
-        //GPIO_SetBits(GPIOD, GPIO_Pin_12);
     }
     else if (command == TURN_LED_ON) {
         GPIO_SetBits(GPIOD, GPIO_Pin_0);
+        ESP8266_SERVER_RESPONSE(ESP8266, response_ajax , "1");
+        Transmit_UART(USART6, USART_data, 800);  
     }
     else if (command == TURN_LED_OFF) {
         GPIO_ResetBits(GPIOD, GPIO_Pin_0);
+        ESP8266_SERVER_RESPONSE(ESP8266, response_ajax , "0");
+    }
+    else if (command == ADC_READ_VALUE) {
+        //GPIO_SetBits(GPIOD, GPIO_Pin_15);
+        Init_Read_DHT22();
+        //Transmit_UART(USART6, USART_data, 800);
+        //ADC_num++;
+        sprintf(ADC_value, "%d", dat_temp);
+        ESP8266_Length_TCP_Buffer(ESP8266, connect_num, strlen(ADC_value)+strlen(response_ajax));
+
+        //Set timeout for waiting wrapper
+        ESP8266->timeout = 5;
+        Start_Track_TimeOut();
+        while (track_time_out < ESP8266->timeout) { 
+            if ((step = Buffer_Find(&USART_buffer, "> ", 2)) >= 0) {
+                if ((USART_buffer.read_idx + step) >= USART_buffer.size) {
+                    USART_buffer.read_idx = USART_buffer.read_idx + step - USART_buffer.size + 2;
+                }
+                else {
+                    USART_buffer.read_idx += step + 2;
+                }
+                //sprintf(ADC_value, "%d %d\r\n", USART_buffer.read_idx, USART_buffer.write_idx);
+                //Transmit_string_UART(USART6, ADC_value);
+                break;
+            }
+        }
+        //if TIMEOUT elapsed and no wrapper is received - return ERROR
+        if (track_time_out >= ESP8266->timeout) {
+            Transmit_string_UART(USART6, "Command AT+CIPSENDBUF: there is no wrapper > after sending TCP buffer length\r\n");
+            ESP8266_RETURN_STATUS(ESP8266,ESP8266_ERROR);
+        }
+       
+        //Set timeout for sending content HTML Web Page
+        //sprintf(ADC_value, "%d", dat_temp);
+        Start_Track_TimeOut();
+        ESP8266->timeout = 20; 
+
+        //-------------- Sending reponse HTTP and Web Page ------------//
+        Transmit_string_UART(ESP8266_USART, response_ajax);
+        Transmit_string_UART(ESP8266_USART, ADC_value);
+        //-------------------------------------------------------------//
+
+        //Waiting for receiving SEND OK
+        //sprintf(ADC_value, "-------- %d %d --------\r\n", USART_buffer.read_idx, USART_buffer.write_idx);
+        //Transmit_string_UART(USART6, ADC_value);
+        while (track_time_out < ESP8266->timeout) {                      
+            if ((step = Buffer_Find(&USART_buffer, "SEND OK", 7)) >= 0) {
+				//sprintf(ADC_value, "-------- %d %d %d --------\r\n", USART_buffer.read_idx, USART_buffer.write_idx, step);
+                Transmit_string_UART(USART6, ADC_value);
+                if ((USART_buffer.read_idx + step) >= USART_buffer.size) {
+                    USART_buffer.read_idx = USART_buffer.read_idx + step - USART_buffer.size + 7;
+                }
+                else {
+                    USART_buffer.read_idx += step + 7;
+                }
+              //  sprintf(ADC_value, "After send command: %d %d\r\n", USART_buffer.read_idx, USART_buffer.write_idx);
+              //  Transmit_string_UART(USART6, ADC_value);
+                //Transmit_string_UART(USART6, "***************\r\n");
+                //for (int x = (USART_buffer.read_idx); x < USART_buffer.write_idx; x++) { 
+                //    Transmit_UART(USART6, (uint8_t*)&USART_data[x], 1);
+                //}
+                //USART_buffer.read_idx += step;
+                break;
+            }
+        }
+        if (track_time_out >= ESP8266->timeout) {
+            Transmit_string_UART(USART6, "Command AT+CIPCLOSE: there is no SEND OK string\r\n");
+            ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR;)
+        }
+
+        ESP8266->current_command = ESP8266_COMMAND_IDLE;
+        ESP8266->IPD.in_IPD_mode = 0;//no in IPD mode anymore
+        //Close connection to browser
+        ESP8266_Close_Connection(ESP8266, ESP8266->IPD.connection_num); 
+        //ESP8266_SERVER_RESPONSE(ESP8266, response_ajax , ADC_value);
     }
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
@@ -1903,6 +2129,7 @@ ESP8266_Result ESP8266_Close_Connection(ESP8266_Str* ESP8266, uint8_t connection
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
     }
     Stop_Track_TimeOut();
+    ESP8266->current_command = ESP8266_COMMAND_IDLE;
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK); 
 }
 
@@ -1922,7 +2149,6 @@ ESP8266_Result ESP8266_Server_Waiting_For_Request(ESP8266_Str* ESP8266) {
         //ParseReceived(ESP8266, char_received, 1, string_length);                 
         string_length = Buffer_Read_String(&USART_buffer, char_received, count); 
     }
-    //GPIO_ResetBits(GPIOD, GPIO_Pin_12);
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 } 
 
@@ -2001,16 +2227,25 @@ void Stop_Track_TimeOut(void) {
 //*****************************************************************//
 void Handle_Request_Browser(ESP8266_Str* ESP8266) {
     uint32_t string_length, count;
+    static int handle_dbg = 0;
+    //char str_dbg[15];
     char char_received[128];
 
     count = sizeof(char_received)/sizeof(char);                  
     string_length = Buffer_Read_String(&USART_buffer, char_received, count);  
     while (1) {
         if (string_length > 0) {
+            //handle_dbg++;
+            //if (handle_dbg == 10000) {
+            //     handle_dbg = 0;
+            //}
+            //sprintf(str_dbg, "Handle request: %d\r\n", handle_dbg);
+            //Transmit_string_UART(USART6, str_dbg);
             Parse_IPD_Data_Received(ESP8266, char_received, count); 
         }                                              
         //ParseReceived(ESP8266, char_received, 1, string_length);                 
-        string_length = Buffer_Read_String(&USART_buffer, char_received, count);  
+        string_length = Buffer_Read_String(&USART_buffer, char_received, count); 
+        //sprintf(str_dbg, "****** Hanle request is %d and %d ******\n", USART_buffer.write_idx, USART_buffer.read_idx);
     }
 }
 

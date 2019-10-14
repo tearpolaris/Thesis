@@ -49,9 +49,10 @@
 //#define 
 //#define 
 //#define 
-#define GET_WEB_PAGE 0 
-#define TURN_LED_ON  1 
-#define TURN_LED_OFF 2 
+#define GET_WEB_PAGE   0 
+#define TURN_LED_ON    1 
+#define TURN_LED_OFF   2 
+#define ADC_READ_VALUE 3
 
 typedef enum {
     ESP8266_ECN_OPEN = 0x0,
