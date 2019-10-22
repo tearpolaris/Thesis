@@ -33,7 +33,7 @@ __INLINE bool CountTimeOut(uint32_t count);
 int fputc(int ch, FILE *f);
 
 //***** Khoi tao GPIO Port A, DATA la Pin A1 *****//
-void Init_DHT22_GPIO(void);
+void Init_DHT22_GPIO(GPIO_InitTypeDef* GPIO_DHT22);
 //************************************************//
 
 //*********** Khoi tao TIMER 2 Pin A1 ************//
@@ -45,7 +45,7 @@ void Init_Output_Compare(TIM_OCInitTypeDef  TIM_OC);
 void Test_Interrupt(void);
 
 //********* Handler Interrupt External Trigger 1 *************//
-void EXTI1_IRQHandler(void);                      
+//void EXTI1_IRQHandler(void);                      
 //************************************************************//
 	
 //********** Get 40-bit Data DHT22 **********//
@@ -61,15 +61,17 @@ void Reset_Data_DHT22(void);
 //******************************************//
 
 //******** Main Init and Read Data DHT22 ******//
-TYPE_DAT_DHT22 Init_Read_DHT22(void);                 
+void Initialization_General_DHT22(void);
+TYPE_DAT_DHT22 Init_Read_DHT22(void);
+void DHT22_Get_Humid_Temp(uint16_t* dat_humid, uint16_t* dat_temp);                 
 //********************************************//
 
 //********* Convert interget to string ********//
-void Convert_Data_LCD(char convert_data[8], uint16_t raw_data);
+//void Convert_Data_LCD(char convert_data[8], uint16_t raw_data);
 //*********************************************//
 
 //*********** Display Info Humid and Temperature **********//
-void Display_Info_Humid_Temp(void);
+//void Display_Info_Humid_Temp(void);
 //********************************************************//
 
 //************************ Code reference  ****************************//

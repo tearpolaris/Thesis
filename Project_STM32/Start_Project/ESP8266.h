@@ -14,6 +14,7 @@
 #define UART_TRANS_ENABLE 0x08
 #define ESP8266_USART USART1
 #define USART_ESP8266_SIZE 800
+#define TMP_BUFFER_SIZE    40
 #define ESP8266_CONNECTION_BUFFER_SIZE  5096
 
 #define ESP8266_MAX_AP_DETECTED 15
@@ -86,6 +87,7 @@ typedef struct {
     uint8_t header_done;
     uint8_t first_packet;
     uint8_t call_data_received;
+    uint8_t command;
     //uint8_t last_activity;
 } ESP8266_Connection_t;
 
