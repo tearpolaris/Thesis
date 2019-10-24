@@ -11,7 +11,8 @@
 uint16_t Read_YL69_A0 (void);
 void Init_YL69_GPIO(void);
 uint8_t Get_End_Conversion_Flag(ADC_TypeDef *  ADCx);
-float Percent_Soil_YL69 (uint16_t Conversion_Value);
+float Percent_Soil_YL69 (void);
+void Init_General_Setting_YL69(void);
 
 #endif
 

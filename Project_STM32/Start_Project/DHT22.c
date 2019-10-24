@@ -198,11 +198,6 @@ TYPE_DAT_DHT22 Init_Read_DHT22() {
     GPIO_InitTypeDef GPIO_DHT22;
     uint32_t count_time_out = 0, ack_bit;
     
-    //Init_TIM2(TIM_BaseStruct);
-    //Test_Interrupt();
-    //TIM_Cmd(TIM2, ENABLE);
-    //Delay(1000000);
-    //Delay(1000000);
     Reset_Data_DHT22();
     Init_DHT22_GPIO(&GPIO_DHT22);
     
