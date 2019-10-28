@@ -16,6 +16,7 @@
 #define USART_ESP8266_SIZE 800
 #define TMP_BUFFER_SIZE    40
 #define ESP8266_CONNECTION_BUFFER_SIZE  5096
+#define ESP8266_MAX_PACKET_IPD          2048
 
 #define ESP8266_MAX_AP_DETECTED 15
 //#define ESP8266_MAX_CONNECTIONS 5
@@ -50,11 +51,14 @@
 //#define 
 //#define 
 //#define 
-#define GET_WEB_PAGE    0 
-#define TURN_LED_ON     1 
-#define TURN_LED_OFF    2 
-#define ADC_READ_VALUE  3
-#define YL69_READ_VALUE 4
+#define GET_WEB_PAGE       0  
+#define ADC_READ_VALUE     1
+#define YL69_READ_VALUE    2
+#define BH1750_READ_VALUE  3
+#define TURN_LIGHT_ON      4
+#define TURN_LIGHT_OFF     5
+#define TURN_MOTOR_ON      6
+#define TURN_MOTOR_OFF     7
 
 typedef enum {
     ESP8266_ECN_OPEN = 0x0,
@@ -201,13 +205,13 @@ typedef struct ESP8266_IPD {
 } ESP8266_IPD;
 
 typedef struct ESP8266_Str{
-    uint32_t time;
-	  uint32_t start_time;
+    //uint32_t time;
+	  //uint32_t start_time;
     uint8_t timeout;
 	  uint32_t current_command;
-    uint32_t last_received_time;
-    uint32_t total_byte_received;
-    uint32_t total_byte_sent;
+    //uint32_t last_received_time;
+    //uint32_t total_byte_received;
+    //uint32_t total_byte_sent;
     uint32_t baud_rate;
     char* command_response;
     uint8_t STA_MAC[4];
@@ -222,8 +226,8 @@ typedef struct ESP8266_Str{
     char DNS_IP[16];
     ESP8266_Result last_result;
     ESP8266_Wifi_connect_error_t Wifi_connect_error;
-    Wifi_Mode send_mode;
-    Wifi_Mode mode;
+    //Wifi_Mode send_mode;
+    //Wifi_Mode mode;
     AP_Config_t AP_Config;
     ESP8266_Connected_Wifi_t connected_Wifi;
     Encrypt_Method_t encrypt_method;

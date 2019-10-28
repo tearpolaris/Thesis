@@ -1,15 +1,7 @@
 #include "DHT22.h"
 #include "LCD.h"
 
-//uint16_t dat_humid, dat_temp;
-//uint8_t toogle = 0;
 uint8_t data[5] = { 0, 0, 0, 0, 0 };
-
-
-//GPIO_InitTypeDef GPIO_DHT22;
-//EXTI_InitTypeDef EXTI_Init_Struct;
-//TIM_OCInitTypeDef  TIM_Structure;
-
 
 static __INLINE void Delay(uint32_t micros) {
     volatile uint32_t timer = TIM2->CNT;
@@ -52,7 +44,7 @@ void Init_DHT22_GPIO(GPIO_InitTypeDef* GPIO_DHT22) {
     //Enable Clock for PORT A
     //RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
     //Enable System  Config Controller Clock
-    GPIO_DHT22->GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
+    GPIO_DHT22->GPIO_Pin = DHT22_PIN;
     GPIO_DHT22->GPIO_Speed = GPIO_Speed_100MHz;
     GPIO_DHT22->GPIO_OType = GPIO_OType_PP;
     GPIO_DHT22->GPIO_PuPd  = GPIO_PuPd_DOWN;
@@ -61,56 +53,37 @@ void Init_DHT22_GPIO(GPIO_InitTypeDef* GPIO_DHT22) {
     GPIO_Init(GPIOA, GPIO_DHT22);
 }
 
-//void Init_Output_Compare(TIM_OCInitTypeDef  TIM_OC) {
-//    TIM_OC.TIM_OCMode     =  TIM_OCMode_PWM2;
-//    TIM_OC.TIM_OutputState =  TIM_OutputState_Enable;
-//    TIM_OC.TIM_Pulse  =  1000;
-//    //TIM_OC.TIM_Pulse  =  2;
-//    TIM_OC.TIM_OCPolarity = TIM_OCPolarity_High;
-//    
-//    //TIM_OC1PreloadConfig(TIM2, TIM_OCPreload_Enable);
-//    TIM_OC2Init(TIM2, &TIM_OC);
-//    TIM_OC2PreloadConfig(TIM2, TIM_OCPreload_Enable);
-//    //TIM_ARRPreloadConfig(TIM2, DISABLE);
-//}
 
 void Init_TIM2(TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure) {
+    uint32_t multipler, TIM2_Clk_Frequency, TIM2_Counter_Frequency;
      //Enable clock peripheral TIM2
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
     /* Enable clock for TIMx */ 
     TIM_InternalClockConfig(TIM2);//Set clock source is Internal Clock CKNT
      /* Time base configuration */
+    RCC_ClocksTypeDef RCC_Clocks;
+    RCC_GetClocksFreq(&RCC_Clocks);
+    if (RCC_Clocks.PCLK1_Frequency == RCC_Clocks.SYSCLK_Frequency) {
+        multipler = 1;
+    }  
+    else {
+        multipler = 2;
+    }
+    TIM2_Clk_Frequency = multipler * RCC_Clocks.PCLK1_Frequency;
+    TIM2_Counter_Frequency = 1000000;//Frequency is 1 kHz
+      
+    TIM_TimeBaseStructure.TIM_Prescaler = (TIM2_Clk_Frequency/TIM2_Counter_Frequency) - 1; //15999
+    //TIM_TimeBaseStructure.TIM_Period = 0;
+
     TIM_TimeBaseStructure.TIM_Period = 999;
-    //TIM_TimeBaseStructure.TIM_Period = 2000;
-    TIM_TimeBaseStructure.TIM_Prescaler = 0xF;//15 => Counter_Clock = 16MHz/(15 +1) = 1MHz
-    TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+    //TIM_TimeBaseStructure.TIM_Prescaler = 0xF;//15 => Counter_Clock = 16MHz/(15 +1) = 1MHz
+    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseStructure.TIM_RepetitionCounter = 0x0; 
     
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 }
 
-//void Init_Interrupt(void) {
-//    NVIC_InitTypeDef NVIC_Init_Struct;
-//    //Noi External Line toi GPIO Source
-//    //SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA , EXTI_PinSource1);
-//    
-//    //NIVC Config Channel
-//    NVIC_Init_Struct.NVIC_IRQChannel                   = EXTI1_IRQn;
-//    NVIC_Init_Struct.NVIC_IRQChannelPreemptionPriority = 0x00;
-//    NVIC_Init_Struct.NVIC_IRQChannelSubPriority        = 0x1;
-//    NVIC_Init_Struct.NVIC_IRQChannelCmd                = ENABLE;
-//    //Init Function
-//    NVIC_Init(&NVIC_Init_Struct);
-//    
-//    //External Mode Config
-//    //EXTI_Init_Struct.EXTI_Mode = EXTI_Mode_Interrupt;//Mode Interrupt 
-//    //EXTI_Init_Struct.EXTI_Line = EXTI_Line1;    
-//    //EXTI_Init_Struct.EXTI_Trigger = EXTI_Trigger_Falling; 
-//    //EXTI_Init_Struct.EXTI_Trigger = EXTI_Trigger_Rising; 
-//    //EXTI_Init_Struct.EXTI_LineCmd = ENABLE; 
-//    //EXTI_Init(&EXTI_Init_Struct);
-//    
-//}
 
 void Test_Interrupt(void) {
     GPIO_InitTypeDef GPIO_Interrupt;
@@ -130,24 +103,6 @@ void Test_Interrupt(void) {
 //********* Handler Interrupt External Trigger 1 *************//
 //                                                            //
 //************************************************************//
-    
-//void EXTI1_IRQHandler(void) {
-//    if (EXTI_GetITStatus(EXTI_Line1) != RESET) {
-//        if (toogle == 1) {
-//            EXTI_Init_Struct.EXTI_LineCmd = DISABLE;//Disable external line 1 no interrupt anymore
-//            //EXTI_Init(&EXTI_Init_Struct);
-//            //GPIO_PinAFConfig(GPIOA, GPIO_PinSource1, 0);
-//            //GPIO_DHT22.GPIO_Mode  = GPIO_Mode_IN;
-//            //GPIO_DHT22.GPIO_PuPd  = GPIO_PuPd_UP;
-//            //GPIO_Init(GPIOA, &GPIO_DHT22);
-//        }      
-//        /* Clear interrupt flag */ 
-//        EXTI_ClearITPendingBit(EXTI_Line1);
-//        toogle++;
-//    }
-//    /* Make sure that interrupt flag is set */      
-//}
-
 ////Lay du lieu phan hoi tu DHT22
 void Get_Data_DHT22(void) {
     uint32_t count_time;
@@ -173,7 +128,13 @@ void Get_Data_DHT22(void) {
 }
 
 bool Check_Sum_DHT22(void) {
-    return (data[4] == (data[0] + data[1] + data[2] + data[3]))? true: false;
+    if (((data[0] + data[1] + data[2] + data[3]) & 0xFF) == data[4]) {
+        return true;
+    }
+    else {
+        return false;
+    }
+    //return (data[4] == (data[0] + data[1] + data[2] + data[3]))? true: false;
 }
 
 void Reset_Data_DHT22(void) {
@@ -196,29 +157,28 @@ void Initialization_General_DHT22(void) {
 TYPE_DAT_DHT22 Init_Read_DHT22() {
     //TIM_TimeBaseInitTypeDef  TIM_BaseStruct;
     GPIO_InitTypeDef GPIO_DHT22;
-    uint32_t count_time_out = 0, ack_bit;
-    
+    uint32_t ack_bit=0;
+    uint8_t dat_save[40];
+    volatile uint32_t count_time_out = 0;
     Reset_Data_DHT22();
     Init_DHT22_GPIO(&GPIO_DHT22);
     
     //Keo xuong 1ms
-    GPIO_ResetBits(GPIOA, GPIO_Pin_1);
+    GPIO_ResetBits(GPIOA, DHT22_PIN);
     Delay(1000);
     
     //Keo len 30us 
-    GPIO_SetBits(GPIOA, GPIO_Pin_1);
+    GPIO_SetBits(GPIOA, DHT22_PIN);
     Delay(30);
-    
      //Giai phong bus cho DHT22 dieu khien
     GPIO_DHT22.GPIO_Mode  = GPIO_Mode_IN;
     GPIO_Init(GPIOA, &GPIO_DHT22);
-    
      //Wait for LOW response level
     while (1) {
         if (!(DATA_DHT22)) {
             break;
         }
-        if (count_time_out > 40) {
+        if (count_time_out > 80) {
             //GPIOD->BSRRL = GPIO_Pin_12;
             return ERROR_RESPONSE_LOW;  //break function due to error
         }
@@ -227,9 +187,8 @@ TYPE_DAT_DHT22 Init_Read_DHT22() {
     }
         //Wait for HIGH reponse level
     count_time_out = 0; 
-    //GPIOD->BSRRL = GPIO_Pin_12;
     while (1) {
-        if ((DATA_DHT22) == 0x2) {
+        if (DATA_DHT22) {
             break;
         }
         if (count_time_out > 85) {
@@ -242,55 +201,85 @@ TYPE_DAT_DHT22 Init_Read_DHT22() {
     count_time_out = 0;     
     
     //Wait for Start Transmission Bit
-    while(1) {
-        if (!(DATA_DHT22)) {
-            break;
-        }
-        if (count_time_out > 75) {
-            return ERROR_TRANSMISSION_START; //break function due to error
-        }
-        count_time_out++;
-        Delay(1);         
-    }
+    //while(1) {
+    //    if (!(DATA_DHT22)) {
+    //        break;
+    //    }
+    //    if (count_time_out > 75) {
+    //        return ERROR_TRANSMISSION_START; //break function due to error
+    //    }
+    //    count_time_out++;
+    //    Delay(1);         
+    //}
     
     //Get 40-bit data
-    for (unsigned char i = 0; i < 40; i++) { //40-bit data  
-        count_time_out = 0;         
-        while(1) {
-            if (((DATA_DHT22) == 0x2) && (ack_bit == 0)) {
-                TIM_SetCounter(TIM2, 0);
-                ack_bit++;
+    //for (unsigned char i = 0; i < 40; i++) { //40-bit data  
+    //    count_time_out = 0;         
+    //    while(1) {
+    //        if (((DATA_DHT22) == 0x2) && (ack_bit == 0)) {
+    //            TIM_SetCounter(TIM2, 0);
+    //            ack_bit++;
+    //        }
+    //        if ((ack_bit > 0) && ((DATA_DHT22) == 0)) {
+    //             ack_bit = 0;
+    //             break;
+    //        }
+    //        if (!ack_bit) {
+    //            if (count_time_out > 75) {
+    //                return ERROR_TRANSMISSION_START; //break function due to error
+    //            }
+    //        }
+    //        else {
+    //            if (count_time_out > 90) {
+    //                return ERROR_BIT_DATA; //break function due to error
+    //            }
+    //        }
+    //        count_time_out++;
+    //        Delay(1);
+    //    }
+    //    data[i/8] <<= 1;
+    //    //if (count_time > 20 ) {
+    //    if (COUNT > 30) {
+    //      data[i/8] |= 1;
+    //    }
+    //}
+    for (unsigned char i = 0; i < 5; i++) { //40-bit data
+        for (int8_t j = 8; j > 0; j--) {  
+           count_time_out = 0;         
+           while(!DATA_DHT22) {
+               if (count_time_out > 75) {
+                   return ERROR_TRANSMISSION_START;
+               }
+               count_time_out++;
+               Delay(1);
+           }
+           count_time_out = 0;
+           while (DATA_DHT22) {
+               if (count_time_out > 90) {
+                   return ERROR_TRANSMISSION_START;
+               }
+               count_time_out++;
+               Delay(1);
+           }
+           if (count_time_out < 4) {
+               GPIO_SetBits(GPIOD, GPIO_Pin_13);
             }
-            if ((ack_bit > 0) && ((DATA_DHT22) == 0)) {
-                 ack_bit = 0;
-                 break;
-            }
-            if (!ack_bit) {
-                if (count_time_out > 75) {
-                    return ERROR_TRANSMISSION_START; //break function due to error
-                }
-            }
-            else {
-                if (count_time_out > 90) {
-                    return ERROR_BIT_DATA; //break function due to error
-                }
-            }
-            count_time_out++;
-            Delay(1);
-        }
-        data[i/8] <<= 1;
-        //if (count_time > 20 ) {
-        if (COUNT > 30) {
-          data[i/8] |= 1;
-        }
+             
+          //if ((count_time_out > 18) && (count_time_out < 40)) {
+          if (count_time_out < 30) {
+              //data[i] |= (uint8_t)0 << (j-1);
+           }
+           else {
+           //if (count_time > 20 ) {
+              data[i] |= (uint8_t)1 << (j-1);
+           }
+       }
     }
-    
     //Check error sum
     if (!Check_Sum_DHT22()) {
-        //GPIOD->BSRRL = GPIO_Pin_14;
+        GPIO_SetBits(GPIOD, GPIO_Pin_12);
         return ERROR_CHECK_SUM; //break function due to error
     }
-    GPIOD->BSRRL = GPIO_Pin_15;
     return DHT22_OK;
 }
 
@@ -298,8 +287,10 @@ void DHT22_Get_Humid_Temp(uint16_t* dat_humid, uint16_t* dat_temp) {
     TYPE_DAT_DHT22 ret_read;
     ret_read = Init_Read_DHT22();
     if (ret_read == DHT22_OK) {
+        GPIO_SetBits(GPIOD, GPIO_Pin_14);
         *dat_humid = ((uint16_t)(data[0] << 8) | data[1]);
         *dat_temp  = (uint16_t)(data[2] << 8) | data[3];
+        //GPIOD->ODR = data[0];
     }
     else {
         *dat_humid = 0;
