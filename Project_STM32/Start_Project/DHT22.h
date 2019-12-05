@@ -11,9 +11,11 @@
 #include <stm32f4xx_exti.h>
 #include <misc.h>
 
-#define DATA_DHT22 (GPIOA->IDR & DHT22_PIN)
+#define GPIO_DHT22  GPIOA
+#define DATA_DHT22 (GPIO_DHT22->IDR & DHT22_PIN)
 #define COUNT      TIM2->CNT
-#define DHT22_PIN   GPIO_Pin_3
+#define DHT22_PIN   GPIO_Pin_1
+
 typedef enum TYPE_RET_DHT22 {DHT22_OK, //DHT22 hoat dong binh thuong
                              ERROR_RESPONSE_LOW, //Time to start response LOW is too long
                              ERROR_RESPONSE_UP, //Time to start response HIGH is too long
@@ -34,7 +36,7 @@ __INLINE bool CountTimeOut(uint32_t count);
 int fputc(int ch, FILE *f);
 
 //***** Khoi tao GPIO Port A, DATA la Pin A1 *****//
-void Init_DHT22_GPIO(GPIO_InitTypeDef* GPIO_DHT22);
+void Init_DHT22_GPIO(GPIO_InitTypeDef* GPIO_DHT);
 //************************************************//
 
 //*********** Khoi tao TIMER 2 Pin A1 ************//

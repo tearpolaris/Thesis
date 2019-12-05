@@ -40,17 +40,17 @@ int fputc(int ch, FILE *f)
 }
 
 
-void Init_DHT22_GPIO(GPIO_InitTypeDef* GPIO_DHT22) {
+void Init_DHT22_GPIO(GPIO_InitTypeDef* GPIO_DHT) {
     //Enable Clock for PORT A
     //RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
     //Enable System  Config Controller Clock
-    GPIO_DHT22->GPIO_Pin = DHT22_PIN;
-    GPIO_DHT22->GPIO_Speed = GPIO_Speed_100MHz;
-    GPIO_DHT22->GPIO_OType = GPIO_OType_PP;
-    GPIO_DHT22->GPIO_PuPd  = GPIO_PuPd_DOWN;
+    GPIO_DHT->GPIO_Pin = DHT22_PIN;
+    GPIO_DHT->GPIO_Speed = GPIO_Speed_100MHz;
+    GPIO_DHT->GPIO_OType = GPIO_OType_PP;
+    GPIO_DHT->GPIO_PuPd  = GPIO_PuPd_DOWN;
     //GPIO_DHT22.GPIO_Mode  = GPIO_Mode_AF;
-    GPIO_DHT22->GPIO_Mode  = GPIO_Mode_OUT;
-    GPIO_Init(GPIOA, GPIO_DHT22);
+    GPIO_DHT->GPIO_Mode  = GPIO_Mode_OUT;
+    GPIO_Init(GPIO_DHT22, GPIO_DHT);
 }
 
 
@@ -149,37 +149,58 @@ void Initialization_General_DHT22(void) {
     Init_TIM2(TIM_BaseStruct);
     Test_Interrupt();
     TIM_Cmd(TIM2, ENABLE);
-    Delay(1000000);
-    Delay(1000000);
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+    Delay(2000000);
+    //Delay(1000000);
+    //GPIO_SetBits(GPIOD, GPIO_Pin_12);
+    if (GPIO_DHT22 == GPIOA) {
+        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+    }
+    else if (GPIO_DHT22 == GPIOB) {
+        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+    }
+    else if (GPIO_DHT22 == GPIOC) {
+        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+    }
+    else if (GPIO_DHT22 == GPIOD) {
+        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+    }
 }
 
 TYPE_DAT_DHT22 Init_Read_DHT22() {
     //TIM_TimeBaseInitTypeDef  TIM_BaseStruct;
-    GPIO_InitTypeDef GPIO_DHT22;
+    GPIO_InitTypeDef GPIO_Init_DHT22;
     uint32_t ack_bit=0;
     uint8_t dat_save[40];
-    volatile uint32_t count_time_out = 0;
+    uint32_t count_time_out = 0;
     Reset_Data_DHT22();
-    Init_DHT22_GPIO(&GPIO_DHT22);
+    //Init_DHT22_GPIO(&GPIO_DHT22);
+    GPIO_Init_DHT22.GPIO_Pin = DHT22_PIN;
+    GPIO_Init_DHT22.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init_DHT22.GPIO_OType = GPIO_OType_PP;
+    GPIO_Init_DHT22.GPIO_PuPd  = GPIO_PuPd_DOWN;
+    //GPIO_DHT22.GPIO_Mode  = GPIO_Mode_AF;
+    GPIO_Init_DHT22.GPIO_Mode  = GPIO_Mode_OUT;
+    GPIO_Init(GPIO_DHT22, &GPIO_Init_DHT22);
     
     //Keo xuong 1ms
-    GPIO_ResetBits(GPIOA, DHT22_PIN);
+    GPIO_ResetBits(GPIO_DHT22, DHT22_PIN);
     Delay(1000);
     
     //Keo len 30us 
-    GPIO_SetBits(GPIOA, DHT22_PIN);
+    GPIO_SetBits(GPIO_DHT22, DHT22_PIN);
     Delay(30);
      //Giai phong bus cho DHT22 dieu khien
-    GPIO_DHT22.GPIO_Mode  = GPIO_Mode_IN;
-    GPIO_Init(GPIOA, &GPIO_DHT22);
+    GPIO_Init_DHT22.GPIO_Mode  = GPIO_Mode_IN;
+    GPIO_Init_DHT22.GPIO_PuPd  = GPIO_PuPd_NOPULL;
+    GPIO_Init(GPIO_DHT22, &GPIO_Init_DHT22);
+    //Delay(40);
      //Wait for LOW response level
     while (1) {
         if (!(DATA_DHT22)) {
             break;
         }
-        if (count_time_out > 80) {
-            //GPIOD->BSRRL = GPIO_Pin_12;
+        if (count_time_out > 40) {
+            GPIOD->BSRRL = GPIO_Pin_12;
             return ERROR_RESPONSE_LOW;  //break function due to error
         }
         count_time_out++;
@@ -192,26 +213,14 @@ TYPE_DAT_DHT22 Init_Read_DHT22() {
             break;
         }
         if (count_time_out > 85) {
+            GPIO_SetBits(GPIOD, GPIO_Pin_13);
             return ERROR_RESPONSE_UP; //break function due to error
         }
         count_time_out++;
         Delay(1);
     } 
-    
     count_time_out = 0;     
-    
-    //Wait for Start Transmission Bit
-    //while(1) {
-    //    if (!(DATA_DHT22)) {
-    //        break;
-    //    }
-    //    if (count_time_out > 75) {
-    //        return ERROR_TRANSMISSION_START; //break function due to error
-    //    }
-    //    count_time_out++;
-    //    Delay(1);         
-    //}
-    
+
     //Get 40-bit data
     //for (unsigned char i = 0; i < 40; i++) { //40-bit data  
     //    count_time_out = 0;         
@@ -245,6 +254,7 @@ TYPE_DAT_DHT22 Init_Read_DHT22() {
     //}
     for (unsigned char i = 0; i < 5; i++) { //40-bit data
         for (int8_t j = 8; j > 0; j--) {  
+    
            count_time_out = 0;         
            while(!DATA_DHT22) {
                if (count_time_out > 75) {
@@ -261,20 +271,13 @@ TYPE_DAT_DHT22 Init_Read_DHT22() {
                count_time_out++;
                Delay(1);
            }
-           if (count_time_out < 4) {
-               GPIO_SetBits(GPIOD, GPIO_Pin_13);
-            }
              
-          //if ((count_time_out > 18) && (count_time_out < 40)) {
-          if (count_time_out < 30) {
-              //data[i] |= (uint8_t)0 << (j-1);
-           }
-           else {
-           //if (count_time > 20 ) {
-              data[i] |= (uint8_t)1 << (j-1);
+           if (count_time_out > 30 ) {
+              data[i] |= ((uint8_t)1 << (j-1));
            }
        }
     }
+
     //Check error sum
     if (!Check_Sum_DHT22()) {
         GPIO_SetBits(GPIOD, GPIO_Pin_12);
