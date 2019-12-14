@@ -3,6 +3,7 @@
 
 uint8_t data[5] = { 0, 0, 0, 0, 0 };
 
+
 static __INLINE void Delay(uint32_t micros) {
     volatile uint32_t timer = TIM2->CNT;
     do {
@@ -40,17 +41,17 @@ int fputc(int ch, FILE *f)
 }
 
 
-void Init_DHT22_GPIO(GPIO_InitTypeDef* GPIO_DHT) {
+void Init_DHT22_GPIO(GPIO_InitTypeDef* GPIO_Init_Str) {
     //Enable Clock for PORT A
     //RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
     //Enable System  Config Controller Clock
-    GPIO_DHT->GPIO_Pin = DHT22_PIN;
-    GPIO_DHT->GPIO_Speed = GPIO_Speed_100MHz;
-    GPIO_DHT->GPIO_OType = GPIO_OType_PP;
-    GPIO_DHT->GPIO_PuPd  = GPIO_PuPd_DOWN;
-    //GPIO_DHT22.GPIO_Mode  = GPIO_Mode_AF;
-    GPIO_DHT->GPIO_Mode  = GPIO_Mode_OUT;
-    GPIO_Init(GPIO_DHT22, GPIO_DHT);
+    GPIO_Init_Str->GPIO_Pin = DHT22_PIN;
+    GPIO_Init_Str->GPIO_Speed = GPIO_Speed_100MHz;
+    GPIO_Init_Str->GPIO_OType = GPIO_OType_PP;
+    GPIO_Init_Str->GPIO_PuPd  = GPIO_PuPd_DOWN;
+    //GPIO_Init22.GPIO_Mode  = GPIO_Mode_AF;
+    GPIO_Init_Str->GPIO_Mode  = GPIO_Mode_OUT;
+    GPIO_Init(GPIOA, GPIO_Init_Str);
 }
 
 
@@ -72,14 +73,15 @@ void Init_TIM2(TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure) {
     TIM2_Clk_Frequency = multipler * RCC_Clocks.PCLK1_Frequency;
     TIM2_Counter_Frequency = 1000000;//Frequency is 1 kHz
       
-    TIM_TimeBaseStructure.TIM_Prescaler = (TIM2_Clk_Frequency/TIM2_Counter_Frequency) - 1; //15999
+    //TIM_TimeBaseStructure.TIM_Prescaler = (TIM2_Clk_Frequency/TIM2_Counter_Frequency) - 1; //15999
     //TIM_TimeBaseStructure.TIM_Period = 0;
 
     TIM_TimeBaseStructure.TIM_Period = 999;
-    //TIM_TimeBaseStructure.TIM_Prescaler = 0xF;//15 => Counter_Clock = 16MHz/(15 +1) = 1MHz
-    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseStructure.TIM_Prescaler = 0xF;//15 => Counter_Clock = 16MHz/(15 +1) = 1MHz
+    //TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseStructure.TIM_ClockDivision = 0;    
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseStructure.TIM_RepetitionCounter = 0x0; 
+    //TIM_TimeBaseStructure.TIM_RepetitionCounter = 0x0; 
     
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 }
@@ -105,26 +107,42 @@ void Test_Interrupt(void) {
 //************************************************************//
 ////Lay du lieu phan hoi tu DHT22
 void Get_Data_DHT22(void) {
-    uint32_t count_time;
-    unsigned char i;
+    uint32_t count_time_out;
+    unsigned char i, ack_bit;
     
-    count_time = 0; 
-    for (i = 0; i < 40; i++) { //40-bit data           
-        while(1) {
-            if (((DATA_DHT22) == 0x2) && (count_time == 0)) {
-                TIM_SetCounter(TIM2, 0);
-                count_time++;
-            }
-            if ((count_time > 0) && ((DATA_DHT22) == 0)) {
-                count_time = 0;
-                break;
-            }
-        }
-        data[i/8] <<= 1;
-        if (COUNT > 30) {
-            data[i/8] |= 1;
-        }
-    }
+    count_time_out = ack_bit = 0; 
+ 		for (unsigned char i = 0; i < 40; i++) { //40-bit data	
+	      count_time_out = 0;			
+		    while(1) {
+					if (((DATA_DHT22) == 0x2) && (ack_bit == 0)) {
+						  TIM_SetCounter(TIM2, 0);
+		    		  ack_bit++;
+		    	}
+		    	if ((ack_bit > 0) && ((DATA_DHT22) == 0)) {
+						 ack_bit = 0;
+						 break;
+					}
+					if (!ack_bit) {
+						  if (count_time_out > 75) {
+                  return;
+						      //return ERROR_TRANSMISSION_START; //break function due to error
+							}
+					}
+					else {
+						  if (count_time_out > 90) {
+                  return;
+								  //return ERROR_BIT_DATA; //break function due to error
+							}
+					}
+					count_time_out++;
+					Delay(1);
+				}
+				data[i/8] <<= 1;
+			  //if (count_time > 20 ) {
+				if (COUNT > 30) {
+				  data[i/8] |= 1;
+				}
+		}
 }
 
 bool Check_Sum_DHT22(void) {
@@ -150,8 +168,6 @@ void Initialization_General_DHT22(void) {
     Test_Interrupt();
     TIM_Cmd(TIM2, ENABLE);
     Delay(2000000);
-    //Delay(1000000);
-    //GPIO_SetBits(GPIOD, GPIO_Pin_12);
     if (GPIO_DHT22 == GPIOA) {
         RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
     }
@@ -173,14 +189,10 @@ TYPE_DAT_DHT22 Init_Read_DHT22() {
     uint8_t dat_save[40];
     uint32_t count_time_out = 0;
     Reset_Data_DHT22();
-    //Init_DHT22_GPIO(&GPIO_DHT22);
-    GPIO_Init_DHT22.GPIO_Pin = DHT22_PIN;
-    GPIO_Init_DHT22.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init_DHT22.GPIO_OType = GPIO_OType_PP;
-    GPIO_Init_DHT22.GPIO_PuPd  = GPIO_PuPd_DOWN;
-    //GPIO_DHT22.GPIO_Mode  = GPIO_Mode_AF;
-    GPIO_Init_DHT22.GPIO_Mode  = GPIO_Mode_OUT;
-    GPIO_Init(GPIO_DHT22, &GPIO_Init_DHT22);
+    //Initialization_General_DHT22();
+    Delay(2000000);
+
+    Init_DHT22_GPIO(&GPIO_Init_DHT22);
     
     //Keo xuong 1ms
     GPIO_ResetBits(GPIO_DHT22, DHT22_PIN);
@@ -191,12 +203,11 @@ TYPE_DAT_DHT22 Init_Read_DHT22() {
     Delay(30);
      //Giai phong bus cho DHT22 dieu khien
     GPIO_Init_DHT22.GPIO_Mode  = GPIO_Mode_IN;
-    GPIO_Init_DHT22.GPIO_PuPd  = GPIO_PuPd_NOPULL;
     GPIO_Init(GPIO_DHT22, &GPIO_Init_DHT22);
     //Delay(40);
      //Wait for LOW response level
     while (1) {
-        if (!(DATA_DHT22)) {
+        if (!DATA_DHT22) {
             break;
         }
         if (count_time_out > 40) {
@@ -219,64 +230,49 @@ TYPE_DAT_DHT22 Init_Read_DHT22() {
         count_time_out++;
         Delay(1);
     } 
-    count_time_out = 0;     
+    count_time_out = 0;   
 
-    //Get 40-bit data
-    //for (unsigned char i = 0; i < 40; i++) { //40-bit data  
-    //    count_time_out = 0;         
-    //    while(1) {
-    //        if (((DATA_DHT22) == 0x2) && (ack_bit == 0)) {
-    //            TIM_SetCounter(TIM2, 0);
-    //            ack_bit++;
-    //        }
-    //        if ((ack_bit > 0) && ((DATA_DHT22) == 0)) {
-    //             ack_bit = 0;
-    //             break;
-    //        }
-    //        if (!ack_bit) {
-    //            if (count_time_out > 75) {
-    //                return ERROR_TRANSMISSION_START; //break function due to error
-    //            }
-    //        }
-    //        else {
-    //            if (count_time_out > 90) {
-    //                return ERROR_BIT_DATA; //break function due to error
-    //            }
-    //        }
-    //        count_time_out++;
-    //        Delay(1);
-    //    }
-    //    data[i/8] <<= 1;
-    //    //if (count_time > 20 ) {
-    //    if (COUNT > 30) {
-    //      data[i/8] |= 1;
-    //    }
-    //}
-    for (unsigned char i = 0; i < 5; i++) { //40-bit data
-        for (int8_t j = 8; j > 0; j--) {  
-    
-           count_time_out = 0;         
-           while(!DATA_DHT22) {
-               if (count_time_out > 75) {
-                   return ERROR_TRANSMISSION_START;
-               }
-               count_time_out++;
-               Delay(1);
-           }
-           count_time_out = 0;
-           while (DATA_DHT22) {
-               if (count_time_out > 90) {
-                   return ERROR_TRANSMISSION_START;
-               }
-               count_time_out++;
-               Delay(1);
-           }
-             
-           if (count_time_out > 30 ) {
-              data[i] |= ((uint8_t)1 << (j-1));
-           }
-       }
-    }
+		while(1) {
+		   if (!(DATA_DHT22)) {
+		    	break;
+		   }
+			 if (count_time_out > 75) {
+				   return ERROR_TRANSMISSION_START; //break function due to error
+			 }
+			 count_time_out++;
+			 Delay(1);
+			 
+		}  
+  
+    for (unsigned char i = 0; i < 40; i++) { //40-bit data	
+	      count_time_out = 0;			
+		    while(1) {
+		    	if ((DATA_DHT22) && (!ack_bit)) {
+		    		  TIM_SetCounter(TIM2, 0);
+		    		  ack_bit++;
+		    	}
+		    	if ((ack_bit > 0) && (!DATA_DHT22)) {
+		    		 ack_bit = 0;
+		    		 break;
+		    	}
+		    	if (!ack_bit) {
+		    		  if (count_time_out > 75) {
+		    		      return ERROR_TRANSMISSION_START; //break function due to error
+		    			}
+		    	}
+		    	else {
+		    		  if (count_time_out > 90) {
+		    				  return ERROR_BIT_DATA; //break function due to error
+		    			}
+		    	}
+		    	count_time_out++;
+		    	Delay(1);
+		    }
+		    data[i/8] <<= 1;
+		    if (COUNT > 40) {
+		      data[i/8] |= 1;
+		    }
+		}
 
     //Check error sum
     if (!Check_Sum_DHT22()) {
