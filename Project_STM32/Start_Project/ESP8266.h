@@ -51,14 +51,17 @@
 //#define 
 //#define 
 //#define 
-#define GET_WEB_PAGE       0  
-#define ADC_READ_VALUE     1
-#define YL69_READ_VALUE    2
-#define BH1750_READ_VALUE  3
-#define TURN_LIGHT_ON      4
-#define TURN_LIGHT_OFF     5
-#define TURN_MOTOR_ON      6
-#define TURN_MOTOR_OFF     7
+#define COMMAND_IDLE       0
+#define GET_WEB_PAGE       1  
+#define ADC_READ_VALUE     2
+#define YL69_READ_VALUE    3
+#define BH1750_READ_VALUE  4
+#define TURN_LIGHT_ON      5
+#define TURN_LIGHT_OFF     6
+#define TURN_MOTOR_ON      7
+#define TURN_MOTOR_OFF     8
+#define SEND_IMAGE_BULBON  9
+#define SEND_IMAGE_BULBOFF 10
 
 typedef enum {
     ESP8266_ECN_OPEN = 0x0,
