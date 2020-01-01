@@ -522,7 +522,6 @@ void Init_Interrupt_TIM3(void) {
 void TIM3_IRQHandler(void) {
     if (TIM_GetITStatus(TIM3, TIM_IT_Update)) {
         if (start_track == 1) {
-				    //GPIO_ToggleBits(GPIOD, GPIO_Pin_14);
             track_count++;
         }
         TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
@@ -881,6 +880,7 @@ void ParseCWJAP(ESP8266_Str* ESP8266, char* received) {
     char* ptr = received;
     uint8_t i, cnt;
 
+
     i = 0;
     if (!strstr(received, "+CWJAP_")) {
         return;
@@ -895,8 +895,8 @@ void ParseCWJAP(ESP8266_Str* ESP8266, char* received) {
     ptr++;//ignore "
     while (*ptr && ((*ptr != '"') || (*(ptr+1) != ',') || (*(ptr+2) != '"'))) {
         ESP8266-> connected_Wifi.SSID[i++] = *ptr;
+        ptr++;
     }
-
     ESP8266->connected_Wifi.SSID[i] = 0;
     ptr += 3;
  
@@ -907,6 +907,7 @@ void ParseCWJAP(ESP8266_Str* ESP8266, char* received) {
     ptr += cnt + 1;//ignore amount of number character and ','
 
     ESP8266->connected_Wifi.RSSI = ParseNumber(ptr, &cnt);   
+    ESP8266->Flags.wifi_connected = 1;
 }
 
 //******************************************************************//
@@ -979,7 +980,7 @@ ESP8266_Result ESP8266_Init(ESP8266_Str* const ESP8266, uint32_t baud_rate) {
     //
     //while (ESP8266_Get_AP_IP(ESP8266) != ESP8266_OK);
     //ESP8266_WAIT_READY_MACRO(ESP8266)
-    ESP8266->timeout = 10;   
+    ESP8266->timeout = 20;   
 
     if (!ESP8266->Flags.last_operation_status) {
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
@@ -1029,6 +1030,7 @@ ESP8266_Result ESP8266_Get_Data_Web(ESP8266_Str* ESP8266, char* SSID_Wifi, char*
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
 
+
 //============================================================================================================//
 //===================================== Make ESP8266 as server   =============================================//
 //============================================================================================================//
@@ -1038,72 +1040,32 @@ ESP8266_Result ESP8266_Setting_WebServer(ESP8266_Str* ESP8266, char* SSID_Wifi, 
     char char_received[128];
     char dummy[2];
     char command[50];
-
-    sprintf(command, "AT+CWJAP_CUR=\"%s\",\"%s\"\r\n", SSID_Wifi, password);
-    Send_Command(ESP8266, ESP8266_COMMAND_CWJAP_SET, command, "OK\r\n");   
+  
+    //Check connect Wifi
+    strcpy(command, "AT+CWJAP_CUR?\r\n");
+    Send_Command(ESP8266, ESP8266_COMMAND_CWJAP_GET, command, "OK\r\n");
     ESP8266_WAIT_READY_MACRO(ESP8266)
     if (!ESP8266->Flags.last_operation_status) {
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
     }
 
-    Send_Command(ESP8266, ESP8266_COMMAND_CIPSTA, "AT+CIPSTA_CUR?\r\n", "OK\r\n");
-	    do {                                                   
-        if(ESP8266->Flags.wait_for_wrapper) {                  
-            if(Buffer_Find(&USART_buffer, "> ", 2) >= 0) {     
-                break;                                         
-            }                                                  
-        }                                                      
-        if(ESP8266->timeout == 0) {                          
-            ESP8266->timeout = 30;                           
-        }                
-                                               
-        if (track_count > ESP8266->timeout) {  
-            //GPIO_SetBits(GPIOD, GPIO_Pin_13);           
-            ESP8266->current_command = ESP8266_COMMAND_IDLE; 
-        }                                                    
-        if ((ESP8266->current_command == ESP8266_COMMAND_SEND_DATA) && (ESP8266->Flags.wait_for_wrapper)) { 
-                found_wrapper = Buffer_Find(&USART_buffer, "> ", 2); 
-                if (found_wrapper == 0) {                            
-                    Buffer_Read_String(&USART_buffer, dummy, 2);     
-                }                                                    
-                if (found_wrapper >= 0) {                            
-                    Process_SendData(ESP8266);                       
-                }                                                    
-        }                                                            
-        if (ESP8266->current_command == ESP8266_COMMAND_USART) {     
-            if (Buffer_Find(&USART_buffer, "OK\r\n", 4) >= 0) {      
-                Buffer_Reset(&USART_buffer);                         
-                ESP8266->current_command = ESP8266_COMMAND_IDLE;     
-                ESP8266->Flags.last_operation_status = 1;               
-            }                                                        
-        }                                                            
-        count = sizeof(char_received)/sizeof(char);                  
-        string_length = Buffer_Read_String(&USART_buffer, char_received, count);     
-        while (string_length > 0) {                                                  
-            ParseReceived(ESP8266, char_received, 1, string_length);                 
-            string_length = Buffer_Read_String(&USART_buffer, char_received, count); 
+    if (!ESP8266->Flags.wifi_connected) {
+        sprintf(command, "AT+CWJAP_CUR=\"%s\",\"%s\"\r\n", SSID_Wifi, password);
+        Send_Command(ESP8266, ESP8266_COMMAND_CWJAP_SET, command, "OK\r\n");   
+        ESP8266_WAIT_READY_MACRO(ESP8266)
+        if (!ESP8266->Flags.last_operation_status) {
+            ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
         }
-    } while(ESP8266->current_command != ESP8266_COMMAND_IDLE); 
-    track_count = 0;                                        
-    start_track = 0;
-    //ESP8266_WAIT_READY_MACRO(ESP8266)
+    }
+   
+    Send_Command(ESP8266, ESP8266_COMMAND_CIPSTA, "AT+CIPSTA_CUR?\r\n", "OK\r\n");
+    ESP8266_WAIT_READY_MACRO(ESP8266)
                            
-    //GPIO_SetBits(GPIOD, GPIO_Pin_13);
     if (!ESP8266->Flags.last_operation_status) {
         ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
-        //GPIO_SetBits(GPIOD, GPIO_Pin_12);
     }
 
     ESP8266_Create_Server (ESP8266, port);
-    //sprintf(command, "AT+CIPSERVER=1,%d\r\n", port);
-    //Send_Command(ESP8266, ESP8266_COMMAND_CIPSERVER, command, "OK\r\n");
-    //
-    //ESP8266_WAIT_READY_MACRO(ESP8266)
-    //if (!ESP8266->Flags.last_operation_status) {
-    //    ESP8266_RETURN_STATUS(ESP8266, ESP8266_ERROR);
-    //}
-
-    //ESP8266_Server_Waiting_For_Request(ESP8266);
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
 
@@ -1117,10 +1079,16 @@ ESP8266_Result Send_Command(ESP8266_Str* ESP8266, uint8_t command, char* command
     char char_received[128];
     char dummy[2];
 
+    //if (command == ESP8266_COMMAND_CWJAP_SET) {
+    //    GPIO_SetBits(GPIOD, GPIO_Pin_12);
+    //}
     ESP8266_CHECK_IDLE(ESP8266)
     if (command_str != NULL) {
         Transmit_UART(USART1, (uint8_t*)command_str, strlen(command_str));
     }
+    //if (command == ESP8266_COMMAND_CWJAP_SET) {
+    //    GPIO_SetBits(GPIOD, GPIO_Pin_13);
+    //}
     ESP8266->current_command = command;
     TIMx_Reset_CNT(TIM3);//Staring timer from 0
     start_track = 1;//Start count time
@@ -1267,6 +1235,9 @@ void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buff
             if (!strncmp(received, "+CWJAP_CUR:", 11)) {
                 ParseCWJAP(ESP8266, received);
             }
+            else if (!strncmp(received, "No AP", strlen("No AP"))) {
+                ESP8266->Flags.wifi_connected = 0;            
+            }
             if (!strcmp(received, "OK\r\n")) {
                 ESP8266->current_command = ESP8266_COMMAND_IDLE;
             }
@@ -1323,7 +1294,6 @@ void ParseReceived(ESP8266_Str* ESP8266, char* received, uint8_t from_usart_buff
                 ParseCIPSTA(ESP8266, received);
             }
             if (!strcmp(received, "OK\r\n")) {
-				//GPIO_SetBits(GPIOD, GPIO_Pin_12);
                 ESP8266->current_command = ESP8266_COMMAND_IDLE;
                 //ESP8266_Callback_WifiIPSet(ESP8266);
             }
@@ -1473,21 +1443,22 @@ ESP8266_Result Parse_IPD_Data_Received(ESP8266_Str* ESP8266, char* received, uin
         connect->number = ESP8266->IPD.connection_num;    
         connect->active = 1;
         connect->call_data_received = 1;
-        ipd_pointer_dat += 2;
-        connect->byte_received = ParseNumber(&received[ipd_pointer_dat], &byte_count);          
-        if (!connect->total_byte_received) {
-             connect->header_done = 0;
-             connect->first_packet = 1;
-        }
-        else {
-             connect->first_packet = 0;
-        }
-        connect->total_byte_received += connect->byte_received;
-
-        ipd_pointer_dat += byte_count + 1;
+        //ipd_pointer_dat += 2;
+        //connect->byte_received = ParseNumber(&received[ipd_pointer_dat], &byte_count);          
+        //if (!connect->total_byte_received) {
+        //     connect->header_done = 0;
+        //     connect->first_packet = 1;
+        //}
+        //else {
+        //     connect->first_packet = 0;
+        //}
+        //connect->total_byte_received += connect->byte_received;
+        //
+        //ipd_pointer_dat += byte_count + 1;
 
         //================================== Process IPD data ================================//
         if (strstr(received, "GET / HTTP/1.1")) { //Request get web page
+            GPIO_SetBits(GPIOD, GPIO_Pin_14);
             connect->command = GET_WEB_PAGE;   
         }
         else if (strstr(received, "GET /readADC")) {
@@ -1510,7 +1481,13 @@ ESP8266_Result Parse_IPD_Data_Received(ESP8266_Str* ESP8266, char* received, uin
         }
         else if (strstr(received, "GET /setMotor?Motorstate=0")) {
             connect->command = TURN_MOTOR_OFF;
-        } 
+        }
+        else if (strstr(received, "GET /pic_bulboff.gif")) {
+            connect->command = SEND_IMAGE_BULBOFF;
+        }
+        else if (strstr(received, "GET /pic_bulbon.gif")) {
+            connect->command = SEND_IMAGE_BULBON;
+        }
     }
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
@@ -1523,21 +1500,70 @@ ESP8266_Result Parse_IPD_Data_Received(ESP8266_Str* ESP8266, char* received, uin
 ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8266, uint8_t command, uint8_t connect_num) {
     char* content = "<!DOCTYPE html>"
                     "<html>"
-		                "<head>"
-					          "<meta charset=\"UTF-8\">"
-					          "<meta name=\"description\" content=\"Thesis IoT\">"
-					          "<meta name=\"author\" content=\"AV\">"
-					          "<title>Luan van tot nghiep</title>"
-					          "<link rel=\"icon\" href=\"data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAS0lEQVR42s2SMQ4AIAjE+P+ncSY"
-                    "dasgNXMJgcyIIlVKPIKdvioAXyWBeJmVpqRZKWtj9QWAKZyWll50b8IcL9JUeQF50n28ckyb0ADG8RLwp05YBAAAAAElFTkSuQmCC\" type=\"image/x-icon\" />"
-					          "<head/>"
-                    "<body>"
+                        "<head>"
+                            "<meta charset=\"UTF-8\">"
+                            "<meta name=\"description\" content=\"Thesis IoT\">"
+                            "<meta name=\"author\" content=\"AV\">"
+                            "<title>Luan van tot nghiep</title>"
+                            "<link rel=\"icon\" href=\"data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAS0lEQVR42s2SMQ4AIAjE+P+ncSY"
+                            "dasgNXMJgcyIIlVKPIKdvioAXyWBeJmVpqRZKWtj9QWAKZyWll50b8IcL9JUeQF50n28ckyb0ADG8RLwp05YBAAAAAElFTkSuQmCC\" type=\"image/x-icon\" />"
+                            "<style>"
+                                ".picture_br {" 
+                                    "background-color: Beige;"
+                                    "background-size: cover;"
+                                "}"
+                                ".button {"
+                                    "padding: 16px 32px;"
+                                    "text-align: center;"
+                                    "text-decoration:none;"
+                                    "display: inline-block;"
+                                    "margin: 4px 2px;" 
+                                    "transition-duration: 0.4s;"
+                                    "cursor: pointer;"
+                                "}"
+                                ".button1 {"
+                                    "background-color: white;"
+                                    "color: black;"
+                                    "border: 2px solid #4CAF50;"
+                                "}"
+                                ".button1.hover {" 
+                                    "background-color: #4CAF50;"
+                                    "color: white;"
+                                "}"
+                                ".button2 {"
+                                    "background-color: white;"
+                                    "color: black;"
+                                    "border: 2px solid #008CBA;"
+                                "}"
+                                ".button2.hover {" 
+                                    "background-color: #008CBA;"
+                                    "color: white;"
+                                "}"
+                            "</style>"
+                        "<head/>"
+                    "<body class=\"picture_br\">"
                     "<div id=\"demo\">"
-                    "<h1>The ESP8266 NodeMCU Update web page without refresh</h1>"
-                    "	<button type=\"button\" onclick=\"LightOn(1)\">LGIHT ON</button>"
-                    "	<button type=\"button\" onclick=\"LightOn(0)\">LIGHT OFF</button><br/>"
-                    "	<button type=\"button\" onclick=\"MotorOn(1)\">MOTOR ON</button>"
-                    "	<button type=\"button\" onclick=\"MotorOn(0)\">MOTOR OFF</button><br/>"
+                    "<h1>LUAN VAN TOT NGHIEP ESP8266</h1>"
+                    "div>"
+                    "<img id=\"LightImage\" src=\"data:image/gif;base64,R0lGODlhZAC0ANX/AMDAwP//zP/M///MzP/Mmf/MZv/MM/+Zmf+ZZv+ZM8z//8z/zMzM/8zMzMyZZsyZM5mZmZmZZplmZplmM2aZmWZmmWZmZmYzZmYzMzNmZjNmMzMzZjMzMzMzADMAAAAzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                   "AAAAAAAAACH5BAEAAAAALAAAAABkALQAQAb/QIBwSCwaj8ikcslsOp/FRgMgpVavUix1O9VmreBvFUo2Zrvo8NWaxrbf3vdQXjar2fczPs6Go+VxWlFfTXB9fYCJeW5dYYuPU2aEg3+MlY58mZpcipuaY5BnonufdZKhqGJrQm6pnopJYoiutKB+nbitr6yNu76gUWq/pH+ki7q4tU/Dsp+iyJXJm6acocVxEFnZzw3be5jS1EqGqrPP2+jogMriZG15wlLb"
+                   "2urlu+3U715q2fPa8tIiAcNnKhejet0AluJFsGEgeRAi+uOWUKLFZ7wiNXQIwKLHjyA/aiTSLeLAjfgQIChAgCWCljBfuiQgc+XKAioRJNjJk8AA/wI7dSYogLIozAIFhtIkcIBly5U0cbqUqjLBy58DhL7USaDoRqBLCzRtSgBm05xCrfJcq1Zp2bRdvcoNkLOsU7EtxTpteeDo0rQB5ApmYgEECA4YNHDYwKGx4ccgLAyeLMkexTX2wFB2l+haL32dhCFK"
+                   "I9eztUOZjrkSlFHzMsvmQPuCN4rZEdK3H16qHTBebGYUOTUaBO6a6FfDl+gBftqWH0zErI3kzDzQN4amq4djZEz7I5KZgYNOVas3ayTao0XXLdx7K87lOytMeA6aeJSlYEebSN8bxuWhUaYKOQAq1I9J9Kn20Ga5obZbJer0AxAtrjGInift8edPNXxsYf8hE5bpFiF9AN7B0IeFdBTSiiyuqNFJKC5hVVkBDKAAAAxY8o+E/EkRAAMB0MRVjE+UVdZYSKFl"
+                   "U1Js8ZQWT0gd9SSRTjCpElIs3WVXX1keRdaRT9FkVZA9UfkEXTP6xVdUXP4VFlp4AcVTYGbi04AHh00QgQNb6XVATjhJMEEHIEBQZ2mocdHeJIeWUaCDvXD4IHeNzhHiPgUaFM9nFgbEG6ahsddhUbYh45t1GE53Xh0LOrPdLfFVNl2K+Y2nH6eYZZfLbR6C+OB6vyIHa4kY2sFoMKh6Zp58uJbn2mfJgfdoiA7Gmuutzo5KW6a2ejogONnuKtBzzWyKSkHu"
+                   "DYv/HTmSDmgIJcDoAW+45tZaHHfTOErvbKP9Up2isi3rrKXHCXztMbLtu6ulyhqca3wOk8frcuGGF6quCld4SnqWjKYgxv86wXHDt6qHLb+vZWuNhDty211v4pxs8hvz9DjRb55uJGyw/ZHYM3QP50sqwsGO5g+C0Ep67mTuTkoMQDwSy7OJH5L73xQ1G/htq8VQ2a2kI1Z0NYVegxt0R//0LLMxjbp7atjz4UpgpevShshEG5as8aF6py12SbzBcyLdSuum"
+                   "dj0A4wYj32y0KIpH/bH44qyVltTi5S4a4Q3hRQwQwB+XU87wRQ3Y6DnnRdiFk0wwGUlAAALMAcAAs9de/6PrTzWZQFyoC5GUTqz72SWXZLG0llM/PVnV7r0PARScLBGf15VLLpkXX1ju3tKczQsRk1Rm3QX8k7pDyXpTa/He+wBR4rS7lkiGFdaXQpX1U5O0dw+AnFap1DpeL2GKkcYiQDA1ZXUFuB/z9EcE9kFFS0uZHlrUAryhPDAp6mMgEgLQJezFJCo2"
+                   "GQpbXqLBMhTmMBvAQGNWyAHIPIYDDCihOCDAwsZcwDGQMZQMCXKZHcZMHwD7xiV8SLBIYSaI5ToYA48IxGjox2x7M9M6mlgcu2EKD147m9y0eDEkOoJBqUpcuzTFxHYxjTxGbFaqplg40eWjjfUqHBxz1ppj5f+jVGncFtC6SJJq/DCPqZHbqZrYxVmtwlFTZOOrgKaMaAURCk9MpBhBBcVFUg43IIJEG5kon1PNcR2yopUcBUlKSZZxWZd05MbUOMlSavKU"
+                   "rtRWH1VZRyMy0j2JwxfMwOPHBnHSi7gEpMoEIkQYsfKY+7rlMHMpHGMBc4+ftKJxIhZG2Z0SiVMLI9cydkVrThOb0ZTl5MJpMD8qMjatFBx80gXNUYITkHR4IzvzWLdr2vMdyrHjLLkpRnf+Z5KCO+Q4NBPL7fSSkrp4p3ruuDbkmBOaCf1a4EQWuHkmx5baZNamrlZQfrJCoa/UKDTM1lCBeROeFVujGS2qsSsGU6X/wWGpI6n4r7HVSqZd26dEQ9Wv1VAz"
+                   "Gc7MJk91STScUo0S6dTmIJvDzXiih6RoxGZBf5kuN360psBsRsCSGrFClBOjzQQVWINJ0WVmRzpjpaY7UmoQn9mTnOpEZCOZZbPagPQed2wk0bL2tyRy1W52iipdW8afd5KNh4Id4xkiVNhP7RI/5wxafSrSWA4dllSRfRth3SpMvJaGphjdj9bsKrXvCEiZ1+Sr3wIJ1M2E9pmT9VtIAdspiEp1tT7zJxBRRCyCKpZlSItlXKtGVKmlDSHjYkcWR+kHvGn1"
+                   "XFYFIyk36rPgGjS6ruWZjv5mXaAuLkYS7RdjKxpP7FYNqk4c/69bTftd3qJ1PlFDHCwGx7ehkki9zz3iR+mW0cW2TGbERJ0iRevfhEC3V5XT4xVUC7i17ZdzJQMccOPWYOjITsCfkVx8H5e5C2PYcpgLCYhFTLDeQSTEKCYdSbLRvRGn2HFmQJD+YujiF7NYEjI2L5XY15Uc9UFy3IBcA4AUQwXQJYOoC8peXgcGBQhgAc1QgOkUMIUbxW52DnSS/j6Ypfjp"
+                   "RU24swsIy7eT/PXueTjBXvHCkiSXVHAtUPGJ+9Zi5uZFpUvBY4pe9BJCOLclKDLRcvfuHL4kGYDMI7xS+MJCQf0FINF5yVIAWydmIznlJn15y1oYmDzXyWQqmf7fWdqW5ySrGOAmc15g76yyZCTxGSmlFgpVsCRm8NWPgVfq30rOEhUur7nNfFYK+wS95Zngec9+mUpOdAc8quyEKN0bwLODx+v2YQnVWJIKre1yE57U2c5QYnW1s9TmoyDlgNNjCZqs4sOk"
+                   "zGTX7SMforUiFDoRkdVsSvO5zU3uZOcOAUQ0wqPh/eniwTvNEyxTwJEAAT7t5csdvEtSHjCBhTOBAi/kgGIysEINgOADLjyMxQthGI0vBjEauGHICzXyJ7RwhYkxechbXgYIVEACGbAAB3R+GA7cGEVBAAA7\" width=\"100\" height=\"180\""
+                    "</div>" 
+                    "<div>"
+                        "<button class=\"button button1\" type=\"button\" onclick=\"LightOn(1)\">LIGHT ON</button>"
+                        "<button type=\"button\" onclick=\"LightOn(0)\">LIGHT OFF</button><br/>"
+                        "<button type=\"button\" onclick=\"MotorOn(1)\">MOTOR ON</button>"
+                        "<button type=\"button\" onclick=\"MotorOn(0)\">MOTOR OFF</button><br/>"
                     "</div>"
                     "<div>"
                     "DHT22 temperature value is : <span id=\"DHT22_temp\">0</span><br/>"
@@ -1549,51 +1575,84 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
                     "</div>"
                     "<script>"
                     "function LightOn(state) {"
-                    "  var xhttp = new XMLHttpRequest();"
-                    "  xhttp.onreadystatechange = function() {"
-                    "    if (this.readyState == 4 && this.status == 200) {"
-                    "      document.getElementById(\"LightState\").innerHTML ="
-                    "      this.responseText;"
-                    "    }"
-                    "  };"
-                    "  xhttp.open(\"GET\", \"setLight?Lightstate=\"+state, true);"
-                    "  xhttp.send();"
+                        "var xhttp = new XMLHttpRequest();"
+                        "var image = document.getElementById('LightImage');"
+                        "xhttp.onreadystatechange = function() {"
+                            "if (this.readyState == 4 && this.status == 200) {"
+                                "document.getElementById(\"LightState\").innerHTML ="
+                                "this.responseText;"
+                                "var result = this.responseText.localeCompare(\"ON\");"
+                                "if (result) {"
+                                    "image.src = \"data:image/gif;base64,R0lGODlhZAC0ANX/AMDAwP//zP/M///MzP/Mmf/MZv/MM/+Zmf+ZZv+ZM8z//8z/zMzM/8zMzMyZZsyZM5mZmZmZZplmZplmM2aZmWZmmWZmZmYzZmYzMzNmZjNmMzMzZjMzMzMzADMAAAAzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                                                  "AAAAAAAAACH5BAEAAAAALAAAAABkALQAQAb/QIBwSCwaj8ikcslsOp/FRgMgpVavUix1O9VmreBvFUo2Zrvo8NWaxrbf3vdQXjar2fczPs6Go+VxWlFfTXB9fYCJeW5dYYuPU2aEg3+MlY58mZpcipuaY5BnonufdZKhqGJrQm6pnopJYoiutKB+nbitr6yNu76gUWq/pH+ki7q4tU/Dsp+iyJXJm6acocVxEFnZzw3be5jS1EqGqrPP2+jogMriZG15wlLb"
+                                                  "2urlu+3U715q2fPa8tIiAcNnKhejet0AluJFsGEgeRAi+uOWUKLFZ7wiNXQIwKLHjyA/aiTSLeLAjfgQIChAgCWCljBfuiQgc+XKAioRJNjJk8AA/wI7dSYogLIozAIFhtIkcIBly5U0cbqUqjLBy58DhL7USaDoRqBLCzRtSgBm05xCrfJcq1Zp2bRdvcoNkLOsU7EtxTpteeDo0rQB5ApmYgEECA4YNHDYwKGx4ccgLAyeLMkexTX2wFB2l+haL32dhCFK"
+                                                  "I9eztUOZjrkSlFHzMsvmQPuCN4rZEdK3H16qHTBebGYUOTUaBO6a6FfDl+gBftqWH0zErI3kzDzQN4amq4djZEz7I5KZgYNOVas3ayTao0XXLdx7K87lOytMeA6aeJSlYEebSN8bxuWhUaYKOQAq1I9J9Kn20Ga5obZbJer0AxAtrjGInift8edPNXxsYf8hE5bpFiF9AN7B0IeFdBTSiiyuqNFJKC5hVVkBDKAAAAxY8o+E/EkRAAMB0MRVjE+UVdZYSKFl"
+                                                  "U1Js8ZQWT0gd9SSRTjCpElIs3WVXX1keRdaRT9FkVZA9UfkEXTP6xVdUXP4VFlp4AcVTYGbi04AHh00QgQNb6XVATjhJMEEHIEBQZ2mocdHeJIeWUaCDvXD4IHeNzhHiPgUaFM9nFgbEG6ahsddhUbYh45t1GE53Xh0LOrPdLfFVNl2K+Y2nH6eYZZfLbR6C+OB6vyIHa4kY2sFoMKh6Zp58uJbn2mfJgfdoiA7Gmuutzo5KW6a2ejogONnuKtBzzWyKSkHu"
+                                                  "DYv/HTmSDmgIJcDoAW+45tZaHHfTOErvbKP9Up2isi3rrKXHCXztMbLtu6ulyhqca3wOk8frcuGGF6quCld4SnqWjKYgxv86wXHDt6qHLb+vZWuNhDty211v4pxs8hvz9DjRb55uJGyw/ZHYM3QP50sqwsGO5g+C0Ep67mTuTkoMQDwSy7OJH5L73xQ1G/htq8VQ2a2kI1Z0NYVegxt0R//0LLMxjbp7atjz4UpgpevShshEG5as8aF6py12SbzBcyLdSuum"
+                                                  "dj0A4wYj32y0KIpH/bH44qyVltTi5S4a4Q3hRQwQwB+XU87wRQ3Y6DnnRdiFk0wwGUlAAALMAcAAs9de/6PrTzWZQFyoC5GUTqz72SWXZLG0llM/PVnV7r0PARScLBGf15VLLpkXX1ju3tKczQsRk1Rm3QX8k7pDyXpTa/He+wBR4rS7lkiGFdaXQpX1U5O0dw+AnFap1DpeL2GKkcYiQDA1ZXUFuB/z9EcE9kFFS0uZHlrUAryhPDAp6mMgEgLQJezFJCo2"
+                                                  "GQpbXqLBMhTmMBvAQGNWyAHIPIYDDCihOCDAwsZcwDGQMZQMCXKZHcZMHwD7xiV8SLBIYSaI5ToYA48IxGjox2x7M9M6mlgcu2EKD147m9y0eDEkOoJBqUpcuzTFxHYxjTxGbFaqplg40eWjjfUqHBxz1ppj5f+jVGncFtC6SJJq/DCPqZHbqZrYxVmtwlFTZOOrgKaMaAURCk9MpBhBBcVFUg43IIJEG5kon1PNcR2yopUcBUlKSZZxWZd05MbUOMlSavKU"
+                                                  "rtRWH1VZRyMy0j2JwxfMwOPHBnHSi7gEpMoEIkQYsfKY+7rlMHMpHGMBc4+ftKJxIhZG2Z0SiVMLI9cydkVrThOb0ZTl5MJpMD8qMjatFBx80gXNUYITkHR4IzvzWLdr2vMdyrHjLLkpRnf+Z5KCO+Q4NBPL7fSSkrp4p3ruuDbkmBOaCf1a4EQWuHkmx5baZNamrlZQfrJCoa/UKDTM1lCBeROeFVujGS2qsSsGU6X/wWGpI6n4r7HVSqZd26dEQ9Wv1VAz"
+                                                  "Gc7MJk91STScUo0S6dTmIJvDzXiih6RoxGZBf5kuN360psBsRsCSGrFClBOjzQQVWINJ0WVmRzpjpaY7UmoQn9mTnOpEZCOZZbPagPQed2wk0bL2tyRy1W52iipdW8afd5KNh4Id4xkiVNhP7RI/5wxafSrSWA4dllSRfRth3SpMvJaGphjdj9bsKrXvCEiZ1+Sr3wIJ1M2E9pmT9VtIAdspiEp1tT7zJxBRRCyCKpZlSItlXKtGVKmlDSHjYkcWR+kHvGn1"
+                                                  "XFYFIyk36rPgGjS6ruWZjv5mXaAuLkYS7RdjKxpP7FYNqk4c/69bTftd3qJ1PlFDHCwGx7ehkki9zz3iR+mW0cW2TGbERJ0iRevfhEC3V5XT4xVUC7i17ZdzJQMccOPWYOjITsCfkVx8H5e5C2PYcpgLCYhFTLDeQSTEKCYdSbLRvRGn2HFmQJD+YujiF7NYEjI2L5XY15Uc9UFy3IBcA4AUQwXQJYOoC8peXgcGBQhgAc1QgOkUMIUbxW52DnSS/j6Ypfjp"
+                                                  "RU24swsIy7eT/PXueTjBXvHCkiSXVHAtUPGJ+9Zi5uZFpUvBY4pe9BJCOLclKDLRcvfuHL4kGYDMI7xS+MJCQf0FINF5yVIAWydmIznlJn15y1oYmDzXyWQqmf7fWdqW5ySrGOAmc15g76yyZCTxGSmlFgpVsCRm8NWPgVfq30rOEhUur7nNfFYK+wS95Zngec9+mUpOdAc8quyEKN0bwLODx+v2YQnVWJIKre1yE57U2c5QYnW1s9TmoyDlgNNjCZqs4sOk"
+                                                  "zGTX7SMforUiFDoRkdVsSvO5zU3uZOcOAUQ0wqPh/eniwTvNEyxTwJEAAT7t5csdvEtSHjCBhTOBAi/kgGIysEINgOADLjyMxQthGI0vBjEauGHICzXyJ7RwhYkxechbXgYIVEACGbAAB3R+GA7cGEVBAAA7\";"
+                                "}"
+                                "else"
+                                "{"
+                                    "image.src = \"data:image/gif;base64,R0lGODlhZAC0ANX/AMDAwP//zP//mf//Zv//M///AP/M///MzP/Mmf/MZv/MM/+Zmf+ZZv+ZM8z//8z/zMz/Zsz/M8zM/8zMzMzMmczMZsyZzMyZmcyZZsyZM5nMzJnMmZmZzJmZmZmZZplmZplmM2ZmmWZmZmYzZmYzMzNmZjNmMzMzZjMzMzMzAAAzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                                                  "AAAAAAAAAACH5BAEAAAAALAAAAABkALQAQAb/QIBwSCwaj8ikcslsOp/EQGFKrVqv2KzWOoB6i9KteEwmAwTZ7nc4KLvf8G2AKCBMCQQmOs7v+417VGB+hIWGV3MAh2IEAmtEbYtaeXaSVwQDlVUDAgGenwF1VgQUFJaXDkKnaaZxE6tYR7BXGpqTFZmzd3lMulSvFBMTGhN4BK+6eI8AkYcEGsETHRMc1BQc0RfFi8rLSYYEFsLT1BPB5MiFat5OYXzC0s"
+                                                  "LRFOQdhOzervDk1RMX/OkYAZjwwAA+fG+OlUNnLl45MwMTHcRnq4AdCOM6aOywAZ65fvG0SduoUVgFPAVSDTwwsSWAAw4skJxJs+bMCUdGknPpkgGD/wQIgDIIiqDoUKEIhv5MsNQngwZQoyI4gADq0wYJeLokGnTpAgQLEnxNQDbsz6NnfTYYSvXAVaUNEGidWBVsUbFkiaJ1GvVq1L5QgRqVOnduAAYKlCYlChRv0bBG9SaNKrGw5SMiVqxAMcIECs8lU"
+                                                  "GgevULE5dNEKloiUBm1kma+DGmFHVvSOgC2eD2pzbuKEdhJaPceLoYO8QKOmAj3xSs2nmDLzKk+lcfdLFIn+ZBafgoS71ZlME4/1XqI9Vm1xOSK7WW8nwETOl6L77HfhfSrJwYq5JFcMGz1BERIcpZxR8Yz4whTDYDwENKNa0No1w9D5zToBid2EAjhIG/0l/8ggw0dCIAEOG2oxHlieNhQghZuIcQEMJm4hAMkbmDTjTjeWOJAO8rYxFpFBRAjPDx6lOA0"
+                                                  "SBoJTwASBJDUU3L52ERRj4nVlVNnJfDXllxi1VhXf0nZhJZrHcXVUGPdxdiaj3U1GQNOEiZmE4cBGZRjig0VFGR4meWUlVVRNic+E6SwGQgeYIDXWQv8ycAHIBjawaA8hdIHJ5R+EYB7sFSi4ZzrHTcGhBaJOiBPnJqaRTcBhDrFp1CgqGofldlym3KzdlfEJrjmugqsVpSniq+zJJJJRY0YQayv5uVqx7OzNtebsMqluogjvBVBokcsvUgkHdYWQokvpTx"
+                                                  "LbRLuTBD/gS9dOBDue+Bp5yosc8i6yjZxVEDBu34QaO8pExiYBQUCc2MEv30QkF0Z8epC7b+WLDyJgJ02URu+WJQS261MIJyQNNh41JE2KMHC8RMlO0PfBhZ0VM002FgQDAS64gMxHCs6hA0H5GgjCawHeZwFMSwGQ0+LhQDtkiEegjTNfUKPsiEh6PBToTBRT3HyaaLAQYqC8xmNjteVnMs1Hx2xKIxM5uBHxgAPBNCjlF2XYSTM/mjAUBnJzS0mzlUneP"
+                                                  "QwGGvRhdwSZHpGh/3srKIwYzhiwAN+z2ktSiteE81IHlmUMq8vVW45FRHoZBMx0ZAkUkY3EgGj4kQ4YHqOtNfk//dOsBfBEk775Ci6t6YLA9MBZg96F1NHCUYlAgEY9OJL0LMk5PJgchll7kNo+ZSZYDkGVJqCMRWVYFT5VSZU12MPQFVYEjXWWMgzJX+WZDUWFllxBSWo+kK47333Y9me+bo0PjOF5S/pw94BwveUL3HvKHxizFeuUhSqcKlb/FtfX3zyp"
+                                                  "T7ZpU3fa9NX7sdBC8Ylg0ZY4FIWo5i7pEUt21sLVn5ypxOikAkBYMqaOsjBs2BlS0O54RoysxkUkAAFSDwBEkkzGhQkToje6AASp2jEJZJmUlBkhyfqNgoBdCKLXrCUg6gwgOJhT4xZO5BFlEap/YiKNZkq2HGSJaOb+f8KjqfZ1LIOtDV8uHGPZPwcGV1iR2J1448F6CMUAHkg3TDDFmZMAiIZqQUNwcaRKKNkQgoQhWA9oZCavMKnUuYELobSDZ+yDhuF"
+                                                  "AMpTYqE1qlSCK/t1ME1gMkKzTFgRVFOeVubyCmV0zy3T+MsxOJKYxRxDInyZzDgkZ5LOGUC7DOAAARzLVEJA5htWeQRormJYtYkkErxpG9zUZgkekWRtuqDNUUWkSU3g3QSquU5FkEsY3jCAOeRIiC7UphVla8J+jhEbR5CTaYZoGCwMejH+nBMAzNQOxdww0VOso51bIGgcjoHRLRDooOCoaEYLN4td1kYBGsBZbejYrHXyawL/CqgnIFYq0lHQ7KHd7Cg"
+                                                  "WFMZPksJiCTrdacEUFtRLcJMZzNHYJBS6CkV6h1zNgNYUfFozJ/AzYQqxhgU0IA5iMGcNESXDfxqyVRiNA3UmW0ZYtxABcYhjbZsLBjEsENSjdkwS4ZjAW+VhJGJwQKctsUQ5BLcPYXhVEuK06iIGG4+QOWQY7bzlQa4qhrambrA8g0dkLdNOD80ns9RYxNkKAQ3CgqimbnCNKeGw12kYDbSohYhr1jrVwkYDtBwohIz8kNXG/mdsfkhsYPvgNAVRAx1ppF"
+                                                  "sfPLsgfsBhD5KFUNQ8BLPBxXYTJHqimJhJAAi09iMU0Bs8KoBKA5CIUgg7/0bg5OqQYIQrD/iklC/VW9gVASRcc4jvoOZ7t/qQQxwiiojicEZdBfnnuo44r+IQljPXvowh1nqRdtvohmNsLkAliQenkvUACWAwUxVmLN6SpOGMCkECBcndcqClkMw6Tm2E0wg2TGGMQY7oAdiLqsJwJLPiGjYeONLvPHNsEQTUTsZHtt0QhKGS3B1gdklOsn4HMo0MQjnKQ"
+                                                  "TYC535HKYJcGcuVywg+uTyoBcrlvP3RkZJmJ4wmJc4Bh0kg9qyiPOLxCAAOmByReOeA4ckOzwBw3gFU2BcUSsZ+8ttTB6m3PKGIj4AN+HDu2KfDRTnwTvI74ADXQr5HR0XS2EtKXv/KMmoA5iUtQJThBvVnFUOvkNRkQQyk/4KlL0HmKDJkAAoDwKXkNQZQyuMK9bxCJfPdsHyXHjWguCIUvtB6LYmpn1/krDhOX5qG0iZTrgNDv/B1RSjouyEHraKUX5tF"
+                                                  "0SwUdf3MgpWpaFvXN7wTtk2Nbgcib9O5nl9gUHgAbp9pMb/OtvxiXb+8uBB/UAF1qMcHpP8JHODKljdQ6rQWMAJAS99btPxmnerzNUC4insK+PRipYDfaYdggrfFdddupCgGL42hIZYQuHIldAADNAQ4ZJh9vAZkAAQ1b0IImqhE0HwGBSpgomZQEHQnTGDpnlHiEY+o9BVgselOEM0USaAXRCuSButr6IAIPlACEZhABFpHQZVlFAQAOw==\";"
+                                "}"
+                            "}"
+                        "};"
+                        "xhttp.open(\"GET\", \"setLight?Lightstate=\"+state, true);"
+                        "xhttp.send();"
                     "}"
                     "function MotorOn(state) {"
-                    "  var xhttp = new XMLHttpRequest();"
-                    "  xhttp.onreadystatechange = function() {"
-                    "    if (this.readyState == 4 && this.status == 200) {"
-                    "      document.getElementById(\"MotorState\").innerHTML ="
-                    "      this.responseText;"
-                    "    }"
-                    "  };"
-                    "  xhttp.open(\"GET\", \"setMotor?Motorstate=\"+state, true);"
-                    "  xhttp.send();"
+                        "var xhttp = new XMLHttpRequest();"
+                        "xhttp.onreadystatechange = function() {"
+                            "if (this.readyState == 4 && this.status == 200) {"
+                                "document.getElementById(\"MotorState\").innerHTML ="
+                                "this.responseText;"
+                            "}"
+                        "};"
+                        "xhttp.open(\"GET\", \"setMotor?Motorstate=\"+state, true);"
+                        "xhttp.send();"
                     "}"
-                    //"setInterval(function() {"
-                    //    "getDataADC();"
-                    //    "getDataYL69();"
-                    //    "getDataBH1750();"
-                    //"}, 10000);"
+                    "setInterval(function() {"
+                        "getDataADC();"
+                        "getDataYL69();"
+                        "getDataBH1750();"
+                    "}, 10000);"
                     "function getDataADC() {"
-                    "var xhttp = new XMLHttpRequest();"
-                    "xhttp.onreadystatechange = function() {"
-                    "  if (this.readyState == 4 && this.status == 200) {"
-                    "    var str = this.responseText.split(' ');"
-                    "    document.getElementById(\"DHT22_temp\").innerHTML = str[0];"
-                    "    document.getElementById(\"DHT22_humid\").innerHTML = str[1];"
-                    "  }"
-                    "};"
-                    "xhttp.open(\"GET\", \"readADC\", true);"
-                    "xhttp.send();"
+                        "var xhttp = new XMLHttpRequest();"
+                        "xhttp.onreadystatechange = function() {"
+                            "if (this.readyState == 4 && this.status == 200) {"
+                                "var str = this.responseText.split(' ');"
+                                "document.getElementById(\"DHT22_temp\").innerHTML = str[0];"
+                                "document.getElementById(\"DHT22_humid\").innerHTML = str[1];"
+                            "}"
+                        "};"
+                        "xhttp.open(\"GET\", \"readADC\", true);"
+                        "xhttp.send();"
                     "}"
                     "function getDataYL69() {"
-                    "var xhttp = new XMLHttpRequest();"
-                    "xhttp.onreadystatechange = function() {"
-                    "  if (this.readyState == 4 && this.status == 200) {"
-                    "    document.getElementById(\"YL69Value\").innerHTML ="
-                    "    this.responseText;"
-                    "  }"
+                        "var xhttp = new XMLHttpRequest();"
+                            "xhttp.onreadystatechange = function() {"
+                            "if (this.readyState == 4 && this.status == 200) {"
+                            "document.getElementById(\"YL69Value\").innerHTML ="
+                            "this.responseText;"
+                        "}"
                     "};"
                     "xhttp.open(\"GET\", \"readYL69\", true);"
                     "xhttp.send();"
@@ -1610,17 +1669,46 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
                     "xhttp.send();"
                     "}"
                     "</script>"
-                    "<script type=\"text/javascript\" src=\"https://cdn.fusioncharts.com/fusioncharts/latest/fusioncharts.js\"></script>"
                     "</body>"
                     "</html>";
 
-    char* response_HTTP =  "HTTP/1.1 200 OK\r\n"
-                           "Content-Type: text/html"
-                           "\r\n\r\n";
+    char* response_HTTP  =  "HTTP/1.1 200 OK\r\n"
+                            "Content-Type: text/html"
+                            "\r\n\r\n";
 
-   char* response_ajax  = "HTTP/1.1 200 OK\r\n"
-                          "Content-Type: text/plain"
-                          "\r\n\r\n";
+   char* response_ajax   = "HTTP/1.1 200 OK\r\n"
+                           "Content-Type: text/plain"
+                           "\r\n\r\n";
+   char* response_image = "HTTP/1.1 200 OK\r\n"
+                           "Content-Type: image/gif"
+                           "\r\n\r\n";
+   //char* data_on = "R0lGODlhZAC0ANX/AMDAwP//zP/M///MzP/Mmf/MZv/MM/+Zmf+ZZv+ZM8z//8z/zMzM/8zMzMyZZsyZM5mZmZmZZplmZplmM2aZmWZmmWZmZmYzZmYzMzNmZjNmMzMzZjMzMzMzADMAAAAzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+   //                "AAAAAAAAACH5BAEAAAAALAAAAABkALQAQAb/QIBwSCwaj8ikcslsOp/FRgMgpVavUix1O9VmreBvFUo2Zrvo8NWaxrbf3vdQXjar2fczPs6Go+VxWlFfTXB9fYCJeW5dYYuPU2aEg3+MlY58mZpcipuaY5BnonufdZKhqGJrQm6pnopJYoiutKB+nbitr6yNu76gUWq/pH+ki7q4tU/Dsp+iyJXJm6acocVxEFnZzw3be5jS1EqGqrPP2+jogMriZG15wlLb"
+   //                "2urlu+3U715q2fPa8tIiAcNnKhejet0AluJFsGEgeRAi+uOWUKLFZ7wiNXQIwKLHjyA/aiTSLeLAjfgQIChAgCWCljBfuiQgc+XKAioRJNjJk8AA/wI7dSYogLIozAIFhtIkcIBly5U0cbqUqjLBy58DhL7USaDoRqBLCzRtSgBm05xCrfJcq1Zp2bRdvcoNkLOsU7EtxTpteeDo0rQB5ApmYgEECA4YNHDYwKGx4ccgLAyeLMkexTX2wFB2l+haL32dhCFK"
+   //                "I9eztUOZjrkSlFHzMsvmQPuCN4rZEdK3H16qHTBebGYUOTUaBO6a6FfDl+gBftqWH0zErI3kzDzQN4amq4djZEz7I5KZgYNOVas3ayTao0XXLdx7K87lOytMeA6aeJSlYEebSN8bxuWhUaYKOQAq1I9J9Kn20Ga5obZbJer0AxAtrjGInift8edPNXxsYf8hE5bpFiF9AN7B0IeFdBTSiiyuqNFJKC5hVVkBDKAAAAxY8o+E/EkRAAMB0MRVjE+UVdZYSKFl"
+   //                "U1Js8ZQWT0gd9SSRTjCpElIs3WVXX1keRdaRT9FkVZA9UfkEXTP6xVdUXP4VFlp4AcVTYGbi04AHh00QgQNb6XVATjhJMEEHIEBQZ2mocdHeJIeWUaCDvXD4IHeNzhHiPgUaFM9nFgbEG6ahsddhUbYh45t1GE53Xh0LOrPdLfFVNl2K+Y2nH6eYZZfLbR6C+OB6vyIHa4kY2sFoMKh6Zp58uJbn2mfJgfdoiA7Gmuutzo5KW6a2ejogONnuKtBzzWyKSkHu"
+   //                "DYv/HTmSDmgIJcDoAW+45tZaHHfTOErvbKP9Up2isi3rrKXHCXztMbLtu6ulyhqca3wOk8frcuGGF6quCld4SnqWjKYgxv86wXHDt6qHLb+vZWuNhDty211v4pxs8hvz9DjRb55uJGyw/ZHYM3QP50sqwsGO5g+C0Ep67mTuTkoMQDwSy7OJH5L73xQ1G/htq8VQ2a2kI1Z0NYVegxt0R//0LLMxjbp7atjz4UpgpevShshEG5as8aF6py12SbzBcyLdSuum"
+   //                "dj0A4wYj32y0KIpH/bH44qyVltTi5S4a4Q3hRQwQwB+XU87wRQ3Y6DnnRdiFk0wwGUlAAALMAcAAs9de/6PrTzWZQFyoC5GUTqz72SWXZLG0llM/PVnV7r0PARScLBGf15VLLpkXX1ju3tKczQsRk1Rm3QX8k7pDyXpTa/He+wBR4rS7lkiGFdaXQpX1U5O0dw+AnFap1DpeL2GKkcYiQDA1ZXUFuB/z9EcE9kFFS0uZHlrUAryhPDAp6mMgEgLQJezFJCo2"
+   //                "GQpbXqLBMhTmMBvAQGNWyAHIPIYDDCihOCDAwsZcwDGQMZQMCXKZHcZMHwD7xiV8SLBIYSaI5ToYA48IxGjox2x7M9M6mlgcu2EKD147m9y0eDEkOoJBqUpcuzTFxHYxjTxGbFaqplg40eWjjfUqHBxz1ppj5f+jVGncFtC6SJJq/DCPqZHbqZrYxVmtwlFTZOOrgKaMaAURCk9MpBhBBcVFUg43IIJEG5kon1PNcR2yopUcBUlKSZZxWZd05MbUOMlSavKU"
+   //                "rtRWH1VZRyMy0j2JwxfMwOPHBnHSi7gEpMoEIkQYsfKY+7rlMHMpHGMBc4+ftKJxIhZG2Z0SiVMLI9cydkVrThOb0ZTl5MJpMD8qMjatFBx80gXNUYITkHR4IzvzWLdr2vMdyrHjLLkpRnf+Z5KCO+Q4NBPL7fSSkrp4p3ruuDbkmBOaCf1a4EQWuHkmx5baZNamrlZQfrJCoa/UKDTM1lCBeROeFVujGS2qsSsGU6X/wWGpI6n4r7HVSqZd26dEQ9Wv1VAz"
+   //                "Gc7MJk91STScUo0S6dTmIJvDzXiih6RoxGZBf5kuN360psBsRsCSGrFClBOjzQQVWINJ0WVmRzpjpaY7UmoQn9mTnOpEZCOZZbPagPQed2wk0bL2tyRy1W52iipdW8afd5KNh4Id4xkiVNhP7RI/5wxafSrSWA4dllSRfRth3SpMvJaGphjdj9bsKrXvCEiZ1+Sr3wIJ1M2E9pmT9VtIAdspiEp1tT7zJxBRRCyCKpZlSItlXKtGVKmlDSHjYkcWR+kHvGn1"
+   //                "XFYFIyk36rPgGjS6ruWZjv5mXaAuLkYS7RdjKxpP7FYNqk4c/69bTftd3qJ1PlFDHCwGx7ehkki9zz3iR+mW0cW2TGbERJ0iRevfhEC3V5XT4xVUC7i17ZdzJQMccOPWYOjITsCfkVx8H5e5C2PYcpgLCYhFTLDeQSTEKCYdSbLRvRGn2HFmQJD+YujiF7NYEjI2L5XY15Uc9UFy3IBcA4AUQwXQJYOoC8peXgcGBQhgAc1QgOkUMIUbxW52DnSS/j6Ypfjp"
+   //                "RU24swsIy7eT/PXueTjBXvHCkiSXVHAtUPGJ+9Zi5uZFpUvBY4pe9BJCOLclKDLRcvfuHL4kGYDMI7xS+MJCQf0FINF5yVIAWydmIznlJn15y1oYmDzXyWQqmf7fWdqW5ySrGOAmc15g76yyZCTxGSmlFgpVsCRm8NWPgVfq30rOEhUur7nNfFYK+wS95Zngec9+mUpOdAc8quyEKN0bwLODx+v2YQnVWJIKre1yE57U2c5QYnW1s9TmoyDlgNNjCZqs4sOk"
+   //                "zGTX7SMforUiFDoRkdVsSvO5zU3uZOcOAUQ0wqPh/eniwTvNEyxTwJEAAT7t5csdvEtSHjCBhTOBAi/kgGIysEINgOADLjyMxQthGI0vBjEauGHICzXyJ7RwhYkxechbXgYIVEACGbAAB3R+GA7cGEVBAAA7";
+   //
+   //char* data_off = "R0lGODlhZAC0ANX/AMDAwP//zP//mf//Zv//M///AP/M///MzP/Mmf/MZv/MM/+Zmf+ZZv+ZM8z//8z/zMz/Zsz/M8zM/8zMzMzMmczMZsyZzMyZmcyZZsyZM5nMzJnMmZmZzJmZmZmZZplmZplmM2ZmmWZmZmYzZmYzMzNmZjNmMzMzZjMzMzMzAAAzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+   //                 "AAAAAAAAAACH5BAEAAAAALAAAAABkALQAQAb/QIBwSCwaj8ikcslsOp/EQGFKrVqv2KzWOoB6i9KteEwmAwTZ7nc4KLvf8G2AKCBMCQQmOs7v+417VGB+hIWGV3MAh2IEAmtEbYtaeXaSVwQDlVUDAgGenwF1VgQUFJaXDkKnaaZxE6tYR7BXGpqTFZmzd3lMulSvFBMTGhN4BK+6eI8AkYcEGsETHRMc1BQc0RfFi8rLSYYEFsLT1BPB5MiFat5OYXzC0s"
+   //                 "LRFOQdhOzervDk1RMX/OkYAZjwwAA+fG+OlUNnLl45MwMTHcRnq4AdCOM6aOywAZ65fvG0SduoUVgFPAVSDTwwsSWAAw4skJxJs+bMCUdGknPpkgGD/wQIgDIIiqDoUKEIhv5MsNQngwZQoyI4gADq0wYJeLokGnTpAgQLEnxNQDbsz6NnfTYYSvXAVaUNEGidWBVsUbFkiaJ1GvVq1L5QgRqVOnduAAYKlCYlChRv0bBG9SaNKrGw5SMiVqxAMcIECs8lU"
+   //                 "GgevULE5dNEKloiUBm1kma+DGmFHVvSOgC2eD2pzbuKEdhJaPceLoYO8QKOmAj3xSs2nmDLzKk+lcfdLFIn+ZBafgoS71ZlME4/1XqI9Vm1xOSK7WW8nwETOl6L77HfhfSrJwYq5JFcMGz1BERIcpZxR8Yz4whTDYDwENKNa0No1w9D5zToBid2EAjhIG/0l/8ggw0dCIAEOG2oxHlieNhQghZuIcQEMJm4hAMkbmDTjTjeWOJAO8rYxFpFBRAjPDx6lOA0"
+   //                 "SBoJTwASBJDUU3L52ERRj4nVlVNnJfDXllxi1VhXf0nZhJZrHcXVUGPdxdiaj3U1GQNOEiZmE4cBGZRjig0VFGR4meWUlVVRNic+E6SwGQgeYIDXWQv8ycAHIBjawaA8hdIHJ5R+EYB7sFSi4ZzrHTcGhBaJOiBPnJqaRTcBhDrFp1CgqGofldlym3KzdlfEJrjmugqsVpSniq+zJJJJRY0YQayv5uVqx7OzNtebsMqluogjvBVBokcsvUgkHdYWQokvpTx"
+   //                 "LbRLuTBD/gS9dOBDue+Bp5yosc8i6yjZxVEDBu34QaO8pExiYBQUCc2MEv30QkF0Z8epC7b+WLDyJgJ02URu+WJQS261MIJyQNNh41JE2KMHC8RMlO0PfBhZ0VM002FgQDAS64gMxHCs6hA0H5GgjCawHeZwFMSwGQ0+LhQDtkiEegjTNfUKPsiEh6PBToTBRT3HyaaLAQYqC8xmNjteVnMs1Hx2xKIxM5uBHxgAPBNCjlF2XYSTM/mjAUBnJzS0mzlUneP"
+   //                 "QwGGvRhdwSZHpGh/3srKIwYzhiwAN+z2ktSiteE81IHlmUMq8vVW45FRHoZBMx0ZAkUkY3EgGj4kQ4YHqOtNfk//dOsBfBEk775Ci6t6YLA9MBZg96F1NHCUYlAgEY9OJL0LMk5PJgchll7kNo+ZSZYDkGVJqCMRWVYFT5VSZU12MPQFVYEjXWWMgzJX+WZDUWFllxBSWo+kK47333Y9me+bo0PjOF5S/pw94BwveUL3HvKHxizFeuUhSqcKlb/FtfX3zyp"
+   //                 "T7ZpU3fa9NX7sdBC8Ylg0ZY4FIWo5i7pEUt21sLVn5ypxOikAkBYMqaOsjBs2BlS0O54RoysxkUkAAFSDwBEkkzGhQkToje6AASp2jEJZJmUlBkhyfqNgoBdCKLXrCUg6gwgOJhT4xZO5BFlEap/YiKNZkq2HGSJaOb+f8KjqfZ1LIOtDV8uHGPZPwcGV1iR2J1448F6CMUAHkg3TDDFmZMAiIZqQUNwcaRKKNkQgoQhWA9oZCavMKnUuYELobSDZ+yDhuF"
+   //                 "AMpTYqE1qlSCK/t1ME1gMkKzTFgRVFOeVubyCmV0zy3T+MsxOJKYxRxDInyZzDgkZ5LOGUC7DOAAARzLVEJA5htWeQRormJYtYkkErxpG9zUZgkekWRtuqDNUUWkSU3g3QSquU5FkEsY3jCAOeRIiC7UphVla8J+jhEbR5CTaYZoGCwMejH+nBMAzNQOxdww0VOso51bIGgcjoHRLRDooOCoaEYLN4td1kYBGsBZbejYrHXyawL/CqgnIFYq0lHQ7KHd7Cg"
+   //                 "WFMZPksJiCTrdacEUFtRLcJMZzNHYJBS6CkV6h1zNgNYUfFozJ/AzYQqxhgU0IA5iMGcNESXDfxqyVRiNA3UmW0ZYtxABcYhjbZsLBjEsENSjdkwS4ZjAW+VhJGJwQKctsUQ5BLcPYXhVEuK06iIGG4+QOWQY7bzlQa4qhrambrA8g0dkLdNOD80ns9RYxNkKAQ3CgqimbnCNKeGw12kYDbSohYhr1jrVwkYDtBwohIz8kNXG/mdsfkhsYPvgNAVRAx1ppF"
+   //                 "sfPLsgfsBhD5KFUNQ8BLPBxXYTJHqimJhJAAi09iMU0Bs8KoBKA5CIUgg7/0bg5OqQYIQrD/iklC/VW9gVASRcc4jvoOZ7t/qQQxwiiojicEZdBfnnuo44r+IQljPXvowh1nqRdtvohmNsLkAliQenkvUACWAwUxVmLN6SpOGMCkECBcndcqClkMw6Tm2E0wg2TGGMQY7oAdiLqsJwJLPiGjYeONLvPHNsEQTUTsZHtt0QhKGS3B1gdklOsn4HMo0MQjnKQ"
+   //                 "TYC535HKYJcGcuVywg+uTyoBcrlvP3RkZJmJ4wmJc4Bh0kg9qyiPOLxCAAOmByReOeA4ckOzwBw3gFU2BcUSsZ+8ttTB6m3PKGIj4AN+HDu2KfDRTnwTvI74ADXQr5HR0XS2EtKXv/KMmoA5iUtQJThBvVnFUOvkNRkQQyk/4KlL0HmKDJkAAoDwKXkNQZQyuMK9bxCJfPdsHyXHjWguCIUvtB6LYmpn1/krDhOX5qG0iZTrgNDv/B1RSjouyEHraKUX5tF"
+   //                 "0SwUdf3MgpWpaFvXN7wTtk2Nbgcib9O5nl9gUHgAbp9pMb/OtvxiXb+8uBB/UAF1qMcHpP8JHODKljdQ6rQWMAJAS99btPxmnerzNUC4insK+PRipYDfaYdggrfFdddupCgGL42hIZYQuHIldAADNAQ4ZJh9vAZkAAQ1b0IImqhE0HwGBSpgomZQEHQnTGDpnlHiEY+o9BVgselOEM0USaAXRCuSButr6IAIPlACEZhABFpHQZVlFAQAOw=="; 
    char display_value[10];
    char* next_response_HTTP;
    static uint8_t ADC_num;
@@ -1629,12 +1717,14 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
    static uint16_t pre_humid, pre_temp;
    uint16_t humid, temp;
    float YL69_dat;
-   size_t len_html, len_transmit;
+   size_t len_html, len_transmit, len_image_on, len_image_off;
 
    ADC_num = step = BH1750_dat = 0;
    humid = temp = 0;
    first_response = 1;
    len_html = strlen(content) + strlen(response_HTTP);
+   //len_image_on = strlen(data_on) + strlen(response_image);
+   //len_image_off = strlen(data_off) + strlen(response_image);
    len_transmit = 0;    
    next_response_HTTP = content;
     if (command == GET_WEB_PAGE) {
@@ -1648,11 +1738,11 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
                 len_html = 0;
            }
             ESP8266_Length_TCP_Buffer(ESP8266, connect_num, len_transmit);
-            Delay_ESP8266(50);            
+            Delay_ESP8266(100);            
             
             //-------------- Sending reponse HTTP and Web Page ------------//
             if (first_response) {
-						    Transmit_string_UART(ESP8266_USART, response_HTTP);
+                            Transmit_string_UART(ESP8266_USART, response_HTTP);
                 Transmit_UART(ESP8266_USART, (uint8_t*)content, len_transmit - strlen(response_HTTP));
             }
             else {
@@ -1669,7 +1759,7 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
             //-------------------------------------------------------------//
             
             //Waiting for receiving SEND OK
-            Delay_ESP8266(300);
+            Delay_ESP8266(600);
         
             //Close connection to browser         
         }
@@ -1717,6 +1807,90 @@ ESP8266_Result ESP8266_CallBack_Server_ConnectionData_Received(ESP8266_Str* ESP8
         GPIO_ResetBits(GPIOD, GPIO_Pin_1);
         ESP8266_SERVER_RESPONSE(ESP8266, connect_num, response_ajax , "OFF");
     }
+    //else if (command == SEND_IMAGE_BULBON) {
+    //    //ESP8266_SERVER_RESPONSE(ESP8266, connect_num, response_image, data_on);
+    //   do {
+    //        if (len_image_on > ESP8266_MAX_PACKET_IPD) {
+    //            len_transmit = ESP8266_MAX_PACKET_IPD; 
+    //            len_image_on = len_image_on - ESP8266_MAX_PACKET_IPD;
+    //        }
+    //        else {
+    //            len_transmit = len_image_on;
+    //            len_image_on = 0;
+    //       }
+    //        ESP8266_Length_TCP_Buffer(ESP8266, connect_num, len_transmit);
+    //        Delay_ESP8266(100);            
+    //        
+    //        //-------------- Sending reponse HTTP and Web Page ------------//
+    //        if (first_response) {
+    //            Transmit_string_UART(ESP8266_USART, response_image);
+    //            Transmit_UART(ESP8266_USART, (uint8_t*)data_on, len_transmit - strlen(response_image));
+    //        }
+    //        else {
+    //            Transmit_UART(ESP8266_USART, (uint8_t*)next_response_HTTP, len_transmit);
+    //        }
+    //
+    //        if (first_response) {
+    //            next_response_HTTP = data_on + len_transmit - strlen(response_image);
+    //            first_response = 0;
+    //        }
+    //        else {
+    //            next_response_HTTP += len_transmit;
+    //        }
+    //        //-------------------------------------------------------------//
+    //        
+    //        //Waiting for receiving SEND OK
+    //        Delay_ESP8266(600);
+    //    
+    //        //Close connection to browser         
+    //    }
+    //    while (len_image_on > 0);
+    //    ESP8266->current_command = ESP8266_COMMAND_IDLE;
+    //    ESP8266->IPD.in_IPD_mode = 0;//no in IPD mode anymore
+    //    ESP8266_Close_Connection(ESP8266, connect_num);
+    //}
+    //else if (command == SEND_IMAGE_BULBOFF) {
+    //    //ESP8266_SERVER_RESPONSE(ESP8266, connect_num, response_image, data_off);
+    //     do {
+    //        if (len_image_off > ESP8266_MAX_PACKET_IPD) {
+    //            len_transmit = ESP8266_MAX_PACKET_IPD; 
+    //            len_image_off = len_image_off - ESP8266_MAX_PACKET_IPD;
+    //        }
+    //        else {
+    //            len_transmit = len_image_off;
+    //            len_image_on = 0;
+    //       }
+    //        ESP8266_Length_TCP_Buffer(ESP8266, connect_num, len_transmit);
+    //        Delay_ESP8266(100);            
+    //        
+    //        //-------------- Sending reponse HTTP and Web Page ------------//
+    //        if (first_response) {
+    //            Transmit_string_UART(ESP8266_USART, response_image);
+    //            Transmit_UART(ESP8266_USART, (uint8_t*)data_off, len_transmit - strlen(response_image));
+    //        }
+    //        else {
+    //            Transmit_UART(ESP8266_USART, (uint8_t*)next_response_HTTP, len_transmit);
+    //        }
+    //
+    //        if (first_response) {
+    //            next_response_HTTP = data_off + len_transmit - strlen(response_image);
+    //            first_response = 0;
+    //        }
+    //        else {
+    //            next_response_HTTP += len_transmit;
+    //        }
+    //        //-------------------------------------------------------------//
+    //        
+    //        //Waiting for receiving SEND OK
+    //        Delay_ESP8266(600);
+    //    
+    //        //Close connection to browser         
+    //    }
+    //    while (len_image_off > 0);
+    //    ESP8266->current_command = ESP8266_COMMAND_IDLE;
+    //    ESP8266->IPD.in_IPD_mode = 0;//no in IPD mode anymore
+    //    ESP8266_Close_Connection(ESP8266, connect_num);
+    //}
     ESP8266_RETURN_STATUS(ESP8266, ESP8266_OK);
 }
 //====================================================================//
@@ -2165,8 +2339,9 @@ void Handle_Request_Browser(ESP8266_Str* ESP8266) {
     char char_received[128];
 
     count = sizeof(char_received)/sizeof(char);                  
-    string_length = Buffer_Read_String(&USART_buffer, char_received, count);  
+    //string_length = Buffer_Read_String(&USART_buffer, char_received, count);  
     while (1) {
+        string_length = Buffer_Read_String(&USART_buffer, char_received, count);  
         if (string_length > 0) {
             Parse_IPD_Data_Received(ESP8266, char_received, count); 
         }      
@@ -2176,11 +2351,12 @@ void Handle_Request_Browser(ESP8266_Str* ESP8266) {
                     ESP8266_CallBack_Server_ConnectionData_Received(ESP8266, ESP8266->connection[i].command, i);
                 }
                 ESP8266->connection[i].call_data_received = 0;
+                ESP8266->connection[i].command = COMMAND_IDLE;
             }
             ESP8266->IPD.in_IPD_mode = 0;
         }                                        
         //ParseReceived(ESP8266, char_received, 1, string_length);                 
-        string_length = Buffer_Read_String(&USART_buffer, char_received, count);
+        //string_length = Buffer_Read_String(&USART_buffer, char_received, count);
         //Delay_ESP8266(30); 
     }
 }
