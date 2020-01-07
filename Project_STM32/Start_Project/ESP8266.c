@@ -85,8 +85,8 @@ static ESP8266_Multi_AP_t ESP8266_Multi_AP;
 static Buffer_t USART_buffer;
 //static Buffer_t TMP_buffer;
 static uint8_t USART_data[USART_ESP8266_SIZE];
-//static uint8_t TMP_data[TMP_BUFFER_SIZE];
-static uint32_t ESP8266_baud_rate[] = {9600,  57600, 115200, 921600};
+static uint8_t received_USART_data[TMP_BUFFER_SIZE];
+//static uint32_t ESP8266_baud_rate[] = {9600,  57600, 115200, 921600};
 //static uint8_t tmp_buffer = 0;
 
 /******************************** BUFFER FUNCTION **************************
