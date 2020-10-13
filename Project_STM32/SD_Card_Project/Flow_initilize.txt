@@ -1,0 +1,19 @@
+﻿SPI dùng: SPI2 -> thuộc về bus APB1
+
+Set SPI Clock rte từ 100 -> 400 kHz (dùng b? chi c? bud rte). 16MHz / 64 = 1/4 MHz => T = 4us
+
+Khi động -> chờ ít nhts ms -> Dely  10ms
+
+Set DI vs CS HIGH => Pin 9 vs Pin 15 => 4us * 74 
+
++ Chờ 100*4 us = 400us.
+
+=> Send Commnd 0 by writing to Tx buffer (SPI_DR) of SPI2 VS CS LOW
+
+ 1 function cho gửi commdn
+ 1 function cho nhn commnd
+
+structure xx{
+    uint8_t x:2;
+	uin8_t y:3;
+}
