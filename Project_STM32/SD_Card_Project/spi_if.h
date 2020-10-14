@@ -16,12 +16,15 @@
 
 
 #define LED_YELLOW    GPIO_Pin_12
+#define LED_ORANGE    GPIO_Pin_13
+#define LED_RED       GPIO_Pin_14
+#define LED_BLUE      GPIO_Pin_15
 
 #define HIGH 1
 #define LOW  0
 
 #ifndef PIN_PACK
-    #define PIN_PACK 3
+    #define PIN_PACK 4
 #endif
 
 #ifndef SD_CS
@@ -63,6 +66,16 @@
     #define SD_AF_MISO          GPIO_PinSource14
     #define SD_AF_MOSI          GPIO_PinSource15
 #elif PIN_PACK == 4
+    #define SPI_SDCARD          SPI2
+    #define GPIO_AF_SDCARD      GPIO_AF_SPI2
+    #define GPIO_SPI            GPIOB
+    #define SD_SCK              GPIO_Pin_10
+    #define SD_MISO             GPIO_Pin_14
+    #define SD_MOSI             GPIO_Pin_15
+    #define SD_AF_SCK           GPIO_PinSource10
+    #define SD_AF_MISO          GPIO_PinSource14
+    #define SD_AF_MOSI          GPIO_PinSource15
+#elif PIN_PACK == 5
     #define SPI_SDCARD          SPI3
     #define GPIO_AF_SDCARD      GPIO_AF_SPI3
     #define GPIO_SPI            GPIOB
@@ -72,7 +85,7 @@
     #define SD_AF_SCK           GPIO_PinSource3
     #define SD_AF_MISO          GPIO_PinSource4
     #define SD_AF_MOSI          GPIO_PinSource5
-#elif PIN_PACK == 5
+#elif PIN_PACK == 6
     #define SPI_SDCARD          SPI3
     #define GPIO_AF_SDCARD      GPIO_AF_SPI3
     #define GPIO_SPI            GPIOC
@@ -82,7 +95,7 @@
     #define SD_AF_SCK           GPIO_PinSource10
     #define SD_AF_MISO          GPIO_PinSource11
     #define SD_AF_MOSI          GPIO_PinSource12
-#elif PIN_PACK == 6
+#elif PIN_PACK == 7
     #define SPI_SDCARD          SPI4
     #define GPIO_AF_SDCARD      GPIO_AF_SPI4
     #define GPIO_SPI            GPIOE
@@ -100,8 +113,8 @@
 
 #define TIM_SDCARD          TIM2
 #define NCR_TIME            100
+#define AMCD41_TIMEOUT      1000
 #define INITIALIZE_TIME     31250
-#define MAX_TRY             100
 
 /* Results of Disk Functions */
 typedef enum {

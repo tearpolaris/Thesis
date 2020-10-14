@@ -36,6 +36,8 @@ void Init_SPI_GPIO_Mode(void) {
     assert_param(IS_GPIO_ALL_PERIPH(GPIO_SPI));
 
     GPIO_InitTypeDef Init_SPI;
+
+    //Provide clock for SPI peripheral
     if (SPI_SDCARD == SPI1) {
         RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE);
     }
@@ -49,6 +51,7 @@ void Init_SPI_GPIO_Mode(void) {
         RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI4, ENABLE); 
     }
 
+    //Provide clock for SCK, MISO, MOSI PIN
     if (GPIO_SPI == GPIOA) {
         RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
     }
@@ -59,6 +62,20 @@ void Init_SPI_GPIO_Mode(void) {
         RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
     }
     else if (GPIO_SPI == GPIOE) {
+        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
+    }
+
+    //Provide clock for CS PIN
+    if (GPIO_CS == GPIOA) {
+        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+    }
+    else if (GPIO_CS == GPIOB) {
+        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+    }
+    else if (GPIO_CS == GPIOC) {
+        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+    }
+    else if (GPIO_CS == GPIOE) {
         RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
     }
 
@@ -151,12 +168,14 @@ void CS_Select(void) {
     Send_Byte(0xFF);
     GPIO_ResetBits(GPIO_CS, SD_CS);
     Send_Byte(0xFF);
+    //Send_Byte(0xFF);
 }
 
 void CS_DeSelect(void) {
     Send_Byte(0xFF);
     GPIO_SetBits(GPIO_CS, SD_CS);
     Send_Byte(0xFF);
+    //Send_Byte(0xFF);
 }
 
 void Set_Pin_CS(uint8_t cs_pin) {
@@ -245,8 +264,6 @@ uint16_t Send_Byte(uint8_t dat) {
 
 uint16_t Send_ACMD_Command(uint8_t command, uint32_t argument) {
     uint16_t res = Send_Command(APP_CMD, 0x0);
-    CS_DeSelect(); //deassert CS pin 
-    CS_Select(); //assert CS pin
     return Send_Command(command, argument);
 }
 
@@ -277,10 +294,12 @@ ERR_Cmd_t Reset_CMD0(void) {
 //********** INTERFACE OPERATING COMMAND - CMD8 ********//
 //******************************************************//
 ERR_Cmd_t If_operating_CMD8(uint32_t pattern) {
-    uint8_t res_r7[2];
+    uint8_t res_r7[2], expected_vhs;
     uint32_t count, response;
 
     count = 0x0;
+    expected_vhs = (uint8_t)pattern & 0xFF;
+
     CS_Select(); //assert pin CS
     WAIT_IDLE_CMD(NCR_TIME)
 
@@ -299,7 +318,7 @@ ERR_Cmd_t If_operating_CMD8(uint32_t pattern) {
  
     Get_Extended_R7(res_r7);
     CS_DeSelect(); //deassert pin CS
-    if (res_r7[1] != pattern) {
+    if (res_r7[1] != expected_vhs) {
         return ERR_CMD_PATTERN;
     }
     return ERR_CMD_OK;
@@ -310,22 +329,32 @@ ERR_Cmd_t If_operating_CMD8(uint32_t pattern) {
 //**********************************************************//
 ERR_Cmd_t Initialization_Complete_ACMD41(void) {
     uint32_t count;
+    uint16_t res;
+
     count = 0x0;
     do {
         CS_Select();
         WAIT_IDLE_CMD(NCR_TIME)
-
-        if (Send_ACMD_Command(SD_SEND_OP_COND, 0x40000000)  == 0x0) { 
+        res = Send_Command(APP_CMD, 0x0);
+        CS_DeSelect();
+        if (res < 0x2) {
+            CS_Select();
+            WAIT_IDLE_CMD(NCR_TIME)
+            res = Send_Command(SD_SEND_OP_COND, 0x40000000);
+            CS_DeSelect();         
+        }
+        if (res == 0x0) {
+            Set_Pin(GPIOD, LED_YELLOW);
             break;
         }
-        Delay_us(TIM_SDCARD, 100); count++;
-        CS_DeSelect();
-    } while (count < NCR_TIME);
+        Delay_us(TIM_SDCARD, 100); 
+        count++;
+    } while (count < AMCD41_TIMEOUT);
 
-    CS_DeSelect();
-    if (count >= NCR_TIME) {
+    if (count >= AMCD41_TIMEOUT) {
         return ERR_CMD_TMOUT;        
     }
+    return ERR_CMD_OK;
 }
 
 //***********************************************//
@@ -364,7 +393,8 @@ ERR_Cmd_t Get_CCS_Info_CMD58(SD_Card_t* sd) {
             sd->sd_type = STANDARD_CAPACITY;
         }
     }
-    CS_DeSelect();    
+    CS_DeSelect();  
+    return ERR_CMD_OK;  
 }
 
 
@@ -400,12 +430,14 @@ ERR_Cmd_t Init_SD_Card(void) {
     }
 
     if ((err_cmd = Initialization_Complete_ACMD41()) != ERR_CMD_OK) {
+        Set_Pin(GPIOD, LED_ORANGE);
         return err_cmd;
     }
     
     if ((err_cmd = Get_CCS_Info_CMD58(sd_info)) != ERR_CMD_OK) {
         return err_cmd;
     }
+    Set_Pin(GPIOD, LED_BLUE);
     return ERR_CMD_OK;
 }
 
