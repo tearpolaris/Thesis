@@ -168,6 +168,6 @@ typedef struct SD_Card {
 //**************** PUBLIC FUNCTION **************//
 //***********************************************//
 ERR_Cmd_t Init_SD_Card(void);
-DRESULT disk_read (uint8_t *buff, uint32_t sector, unsigned int count);
+//DRESULT disk_read (uint8_t *buff, uint32_t sector, unsigned int count);
 
 #endif

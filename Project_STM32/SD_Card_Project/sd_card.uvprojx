@@ -335,7 +335,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER,STM32F411xx</Define>
               <Undefine></Undefine>
-              <IncludePath>D:\Thesis_IoT\Library_STM32F4\en.stm32f4_dsp_stdperiph_lib\STM32F4xx_DSP_StdPeriph_Lib_V1.8.0\Libraries\STM32F4xx_StdPeriph_Driver\inc;D:\Thesis_IoT\Library_STM32F4\en.stm32f4_dsp_stdperiph_lib\STM32F4xx_DSP_StdPeriph_Lib_V1.8.0\Libraries\STM32F4xx_StdPeriph_Driver\src;D:\Thesis_IoT\Library_STM32F4\en.stm32f4_dsp_stdperiph_lib\STM32F4xx_DSP_StdPeriph_Lib_V1.8.0\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\SD_Card;D:\Thesis_IoT\00_FreeRTOS\Source_code\FreeRTOSv10.2.1\FreeRTOS\Source\portable\RVDS\ARM_CM4F;D:\Thesis_IoT\00_FreeRTOS\Source_code\FreeRTOSv10.2.1\FreeRTOS\Source\include</IncludePath>
+              <IncludePath>D:\Thesis_IoT\Library_STM32F4\en.stm32f4_dsp_stdperiph_lib\STM32F4xx_DSP_StdPeriph_Lib_V1.8.0\Libraries\STM32F4xx_StdPeriph_Driver\inc;D:\Thesis_IoT\Library_STM32F4\en.stm32f4_dsp_stdperiph_lib\STM32F4xx_DSP_StdPeriph_Lib_V1.8.0\Libraries\STM32F4xx_StdPeriph_Driver\src;D:\Thesis_IoT\Library_STM32F4\en.stm32f4_dsp_stdperiph_lib\STM32F4xx_DSP_StdPeriph_Lib_V1.8.0\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\SD_Card_Project</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -388,16 +388,6 @@
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\main.c</FilePath>
-            </File>
-            <File>
-              <FileName>list.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\list.c</FilePath>
-            </File>
-            <File>
-              <FileName>timers.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\timers.c</FilePath>
             </File>
           </Files>
         </Group>

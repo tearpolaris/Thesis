@@ -443,44 +443,44 @@ ERR_Cmd_t Init_SD_Card(void) {
 
 
 
-DRESULT disk_read (uint8_t *buff, uint32_t sector, unsigned int count) {
-    //DRESULT res = RES_OK;
-    uint32_t data_addr, tmout = 0x0;
-    uint16_t response;
-
-    if (!buff) {
-        return RES_PARERR;
-    }
-  
-    data_addr = sector;
-    if (sd_info->sd_type == STANDARD_CAPACITY) {
-        data_addr = sector * READ_BL_LEN;
-    }  
-    if ((response = Send_Command(READ_SINGLE_BLOCK, data_addr)) != 0xFF) {
-        while (tmout < 3125) {
-            if ((response = Send_Byte(0xFF)) != 0xFF) {
-                break;
-            }
-        }
-        GPIO_SetBits(GPIOD, GPIO_Pin_14);
-        if (tmout >= 3125) {
-            if (response == 0xFF) {
-                return RES_NOTRDY; //not response a valid R1
-            }
-            else {
-                return RES_ERROR; //error when reading
-            }
-        }
-    }
-
-    for (int i = 0; i < READ_BL_LEN; i++) {
-        uint8_t data = (uint8_t)Send_Byte(0xFF);
-        if (i < count) {
-            *(buff + i) = data;
-        }
-    }
-    return RES_OK;
-}
+//DRESULT disk_read (uint8_t *buff, uint32_t sector, unsigned int count) {
+//    //DRESULT res = RES_OK;
+//    uint32_t data_addr, tmout = 0x0;
+//    uint16_t response;
+//
+//    if (!buff) {
+//        return RES_PARERR;
+//    }
+//  
+//    data_addr = sector;
+//    if (sd_info->sd_type == STANDARD_CAPACITY) {
+//        data_addr = sector * READ_BL_LEN;
+//    }  
+//    if ((response = Send_Command(READ_SINGLE_BLOCK, data_addr)) != 0xFF) {
+//        while (tmout < 3125) {
+//            if ((response = Send_Byte(0xFF)) != 0xFF) {
+//                break;
+//            }
+//        }
+//        GPIO_SetBits(GPIOD, GPIO_Pin_14);
+//        if (tmout >= 3125) {
+//            if (response == 0xFF) {
+//                return RES_NOTRDY; //not response a valid R1
+//            }
+//            else {
+//                return RES_ERROR; //error when reading
+//            }
+//        }
+//    }
+//
+//    for (int i = 0; i < READ_BL_LEN; i++) {
+//        uint8_t data = (uint8_t)Send_Byte(0xFF);
+//        if (i < count) {
+//            *(buff + i) = data;
+//        }
+//    }
+//    return RES_OK;
+//}
 
 
 
