@@ -380,14 +380,29 @@
           <GroupName>Source Code</GroupName>
           <Files>
             <File>
-              <FileName>spi_if.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\spi_if.c</FilePath>
-            </File>
-            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\main.c</FilePath>
+            </File>
+            <File>
+              <FileName>ff.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ff.c</FilePath>
+            </File>
+            <File>
+              <FileName>ffsystem.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ffsystem.c</FilePath>
+            </File>
+            <File>
+              <FileName>ffunicode.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ffunicode.c</FilePath>
+            </File>
+            <File>
+              <FileName>diskio.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\diskio.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -395,9 +410,19 @@
           <GroupName>Header file</GroupName>
           <Files>
             <File>
-              <FileName>spi_if.h</FileName>
+              <FileName>diskio.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\spi_if.h</FilePath>
+              <FilePath>.\diskio.h</FilePath>
+            </File>
+            <File>
+              <FileName>ff.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\ff.h</FilePath>
+            </File>
+            <File>
+              <FileName>ffconf.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\ffconf.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -458,6 +483,11 @@
               <FileName>stm32f4xx_tim.c</FileName>
               <FileType>1</FileType>
               <FilePath>D:\Thesis_IoT\Library_STM32F4\en.stm32f4_dsp_stdperiph_lib\STM32F4xx_DSP_StdPeriph_Lib_V1.8.0\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_tim.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_usart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>D:\Thesis_IoT\Library_STM32F4\en.stm32f4_dsp_stdperiph_lib\STM32F4xx_DSP_StdPeriph_Lib_V1.8.0\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_usart.c</FilePath>
             </File>
           </Files>
         </Group>
